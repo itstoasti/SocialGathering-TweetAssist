@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="popup.js"></script>
+</head>
+
+<body>
+  <div class="container fade-in">
+
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <img src="./images/XReplyGPT.png" alt="Logo">
+        <h1>Tweet Assist</h1>
+      </div>
+      <a href="https://chrome.google.com/webstore/detail/xreplygpt/ajjgpcaiofpdenhkmabcadabajmimpdk/reviews"
+        target="_blank" class="review-btn">
+        Rate ⭐
+      </a>
+    </header>
+
+    <!-- Stats Panel -->
+    <div class="glass-panel" style="text-align: center; padding: 10px;">
+      <div style="font-size: 0.9em; opacity: 0.8;">Replies Today</div>
+      <div id="reply-count" style="font-size: 1.5em; font-weight: bold; color: var(--primary);">0</div>
+    </div>
+
+    <!-- Customization Panel -->
+    <div class="glass-panel">
+      <div class="section-title">Behavior</div>
+
+      <div class="form-group">
+        <label for="gpt-query">System Prompt</label>
+        <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+          <select id="prompt-select" style="flex-grow: 1; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+            <option value="custom">Custom </option>
+          </select>
+          <button id="save-prompt-btn" class="btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;"
+            title="Save current prompt">💾</button>
+          <button id="delete-prompt-btn" class="btn-secondary"
+            style="padding: 2px 8px; font-size: 0.8rem; color: #ff4444;" title="Delete selected prompt">🗑️</button>
+        </div>
+        <textarea id="gpt-query" rows="3" placeholder="You are a helpful assistant..."></textarea>
+      </div>
+
+      <div class="checkbox-wrappers">
+        <label class="checkbox-group">
+          <input checked type="checkbox" id="window-close">
+          Close window after reply
+        </label>
+        <label class="checkbox-group">
+          <input type="checkbox" id="auto-send">
+          Auto-send on redirect
+        </label>
+      </div>
+    </div>
+
+    <!-- Settings Button Area -->
+    <div style="text-align: center; margin-bottom: 20px;">
+      <a href="settings.html" class="btn-primary"
+        style="text-decoration: none; display: inline-block; width: auto; padding: 8px 16px;">
+        ⚙️ Open Settings
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <a href="#" style="pointer-events: none;">© 2026 Tweet Assist</a>
+      <a href="https://github.com/marcolivierbouch/XReplyGPT" target="_blank">Github</a>
+      <a href="changelog.html" target="_blank">Changelog</a>
+    </footer>
+  </div>
+</body>
+
+</html>

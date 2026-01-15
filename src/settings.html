@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>Tweet Assist Settings</title>
+    <script src="settings.js"></script>
+</head>
+
+<body>
+    <div class="container fade-in">
+
+        <!-- Header -->
+        <header style="justify-content: start; gap: 15px;">
+            <a href="index.html" class="back-btn" style="text-decoration: none; font-size: 1.2em;">⬅️</a>
+            <h1>Settings</h1>
+        </header>
+
+        <!-- Stats Settings -->
+        <div class="glass-panel">
+            <div class="section-title">Stats Configuration</div>
+            <div class="form-group">
+                <label for="reset-hour">Daily Reset Hour (0-23)</label>
+                <div style="font-size: 0.8em; opacity: 0.7; margin-bottom: 5px;">
+                    Input the hour (local time) when your "day" should restart.
+                    <br>Example: 17 = 5:00 PM.
+                </div>
+                <input type="number" id="reset-hour" min="0" max="23" placeholder="0">
+            </div>
+        </div>
+
+        <!-- Main Configuration Panel (Moved from index.html) -->
+        <div class="glass-panel">
+            <div class="section-title">AI Configuration</div>
+
+            <!-- Provider Selection -->
+            <div class="form-group">
+                <label for="provider-select">AI Provider</label>
+                <select id="provider-select">
+                    <option value="gemini">Gemini (Free Tier)</option>
+                    <option value="openai">OpenAI</option>
+                </select>
+            </div>
+
+            <!-- OpenAI Config -->
+            <div id="openai-config" class="hidden form-group">
+                <div class="validation-group">
+                    <input type="password" id="api-key" placeholder="sk-...">
+                    <button id="validate-button" class="btn-primary">Validate</button>
+                </div>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="show-api-key"> Show API Key
+                </label>
+            </div>
+
+            <!-- Gemini Config -->
+            <div id="gemini-config" class="form-group">
+                <div class="validation-group">
+                    <input type="password" id="gemini-api-key" placeholder="AIza...">
+                    <button id="validate-gemini-button" class="btn-primary">Validate</button>
+                </div>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="show-gemini-api-key"> Show API Key
+                </label>
+            </div>
+
+            <!-- Model Selection -->
+            <div class="form-group">
+                <label for="models-select">Select Model</label>
+                <select id="models-select"></select>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <a href="#" style="pointer-events: none;">© 2026 Tweet Assist</a>
+        </footer>
+    </div>
+</body>
+
+</html>

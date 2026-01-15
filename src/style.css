@@ -1,0 +1,276 @@
+/* Modern 2026 Design System */
+:root {
+  --bg-color: #000000;
+  --text-main: #ffffff;
+  --text-muted: #8899a6;
+  --accent-color: #1d9bf0;
+  --accent-hover: #1a8cd8;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --success-color: #00ba7c;
+  --error-color: #f4212e;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  width: 400px;
+  min-height: 500px;
+  overflow-x: hidden;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Layout */
+.container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-area img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+h1 {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(90deg, #1d9bf0, #8e2de2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.review-btn {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.review-btn:hover {
+  color: var(--accent-color);
+}
+
+/* Glass Panels */
+.glass-panel {
+  background: var(--bg-color); /* Fallback */
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: -8px;
+}
+
+/* Forms */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  transition: var(--transition);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.2);
+}
+
+/* Custom Checkbox */
+.checkbox-wrappers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.checkbox-group input {
+    accent-color: var(--accent-color);
+    width: 16px;
+    height: 16px;
+}
+
+/* Validation Group */
+.validation-group {
+    display: flex;
+    gap: 8px;
+}
+
+.validation-group input {
+    flex: 1;
+}
+
+.btn-primary {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-secondary:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+/* Shortcuts List */
+.shortcut-list {
+    list-style: none;
+    font-size: 13px;
+}
+
+.shortcut-list li {
+    display: flex;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.shortcut-list li:last-child {
+    border-bottom: none;
+}
+
+.shortcut-key {
+    background: rgba(255,255,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    margin-right: 8px;
+    color: var(--accent-color);
+}
+
+/* Footer */
+footer {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    padding-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+footer a:hover {
+    color: var(--text-main);
+}
+
+/* Utilities */
+.hidden {
+    display: none !important;
+}
+
+@keyframes breathing {
+    0% { box-shadow: 0 0 0 0 rgba(244, 33, 46, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(244, 33, 46, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 33, 46, 0); }
+}
+
+.invalid {
+    animation: breathing 2s infinite;
+    border-color: var(--error-color) !important;
+}
