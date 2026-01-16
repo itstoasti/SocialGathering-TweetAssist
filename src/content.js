@@ -93,6 +93,30 @@ function extractTweetInfo(tweetElement) {
   };
 }
 
+// Helper function to increment daily reply stats
+function incrementDailyStats() {
+  chrome.storage.local.get(['daily-stats', 'stats-reset-hour']).then((res) => {
+    const resetHour = res['stats-reset-hour'] || 0;
+
+    const now = new Date();
+    if (now.getHours() < resetHour) {
+      now.setDate(now.getDate() - 1);
+    }
+    const logicDateKey = `${now.toDateString()}_${resetHour}`;
+
+    let stats = res['daily-stats'] || { date: logicDateKey, count: 0 };
+
+    if (stats.date !== logicDateKey) {
+      stats = { date: logicDateKey, count: 1 };
+    } else {
+      stats.count = (stats.count || 0) + 1;
+    }
+
+    chrome.storage.local.set({ 'daily-stats': stats });
+    console.log("[TweetAssist] Stats incremented. New count:", stats.count);
+  });
+}
+
 async function urlToBase64(url) {
   try {
     const response = await fetch(url);
@@ -116,11 +140,106 @@ async function urlToBase64(url) {
 
 
 async function handleGenerateClick(tweetInfo, resultContainer) {
-  resultContainer.innerHTML = 'Generating...';
+  // Create a visually appealing loading state matching Scout widget style
+  resultContainer.innerHTML = `
+    <div class="tweet-assist-loading">
+      <div class="tweet-assist-loading-spinner"></div>
+      <div class="tweet-assist-loading-text">
+        <span class="tweet-assist-loading-sparkle">✨</span>
+        <span>Generating reply</span>
+        <span class="tweet-assist-loading-dots"></span>
+      </div>
+    </div>
+  `;
+
+  // Inject loading styles if not already present
+  if (!document.getElementById('tweet-assist-loading-styles')) {
+    const style = document.createElement('style');
+    style.id = 'tweet-assist-loading-styles';
+    style.textContent = `
+      .tweet-assist-loading {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: linear-gradient(135deg, rgba(0, 186, 124, 0.1), rgba(29, 155, 240, 0.1));
+        border: 1px solid rgba(29, 155, 240, 0.3);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        animation: tweet-assist-pulse 2s ease-in-out infinite;
+      }
+      
+      @keyframes tweet-assist-pulse {
+        0%, 100% { 
+          box-shadow: 0 0 0 0 rgba(29, 155, 240, 0.2);
+          border-color: rgba(29, 155, 240, 0.3);
+        }
+        50% { 
+          box-shadow: 0 0 20px 0 rgba(29, 155, 240, 0.15);
+          border-color: rgba(0, 186, 124, 0.5);
+        }
+      }
+      
+      .tweet-assist-loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(29, 155, 240, 0.2);
+        border-top: 3px solid #1d9bf0;
+        border-right: 3px solid #00ba7c;
+        border-radius: 50%;
+        animation: tweet-assist-spin 1s linear infinite;
+      }
+      
+      @keyframes tweet-assist-spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .tweet-assist-loading-text {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        color: inherit;
+        opacity: 0.9;
+      }
+      
+      .tweet-assist-loading-sparkle {
+        animation: tweet-assist-sparkle 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes tweet-assist-sparkle {
+        0%, 100% { 
+          transform: scale(1) rotate(0deg);
+          opacity: 1;
+        }
+        50% { 
+          transform: scale(1.2) rotate(15deg);
+          opacity: 0.7;
+        }
+      }
+      
+      .tweet-assist-loading-dots::after {
+        content: '';
+        animation: tweet-assist-dots 1.5s infinite;
+      }
+      
+      @keyframes tweet-assist-dots {
+        0% { content: ''; }
+        25% { content: '.'; }
+        50% { content: '..'; }
+        75% { content: '...'; }
+        100% { content: ''; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   try {
     const apiKey = await chrome.storage.local.get(['open-ai-key']);
     const geminiApiKey = await chrome.storage.local.get(['gemini-api-key']);
+    const xaiApiKey = await chrome.storage.local.get(['xai-api-key']);
     const gptQuery = await chrome.storage.local.get(['gpt-query']);
     const aiProvider = await chrome.storage.local.get(['ai-provider']);
 
@@ -130,8 +249,19 @@ async function handleGenerateClick(tweetInfo, resultContainer) {
     const userHandle = user ? '@' + user.href.split('/').pop() : 'unknown';
 
     const provider = aiProvider['ai-provider'] || 'gemini';
-    const model = await chrome.storage.local.get(provider === 'openai' ? ['openai-model'] : ['gemini-model']);
-    const selectedModel = model[provider === 'openai' ? 'openai-model' : 'gemini-model'] || (provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-3.5-turbo');
+
+    // Get the correct model based on provider
+    let selectedModel;
+    if (provider === 'openai') {
+      const model = await chrome.storage.local.get(['openai-model']);
+      selectedModel = model['openai-model'] || 'gpt-3.5-turbo';
+    } else if (provider === 'xai') {
+      const model = await chrome.storage.local.get(['xai-model']);
+      selectedModel = model['xai-model'] || 'grok-4-1-fast-non-reasoning';
+    } else {
+      const model = await chrome.storage.local.get(['gemini-model']);
+      selectedModel = model['gemini-model'] || 'gemini-1.5-flash';
+    }
 
     console.log(`Generating reply for ${tweetInfo.id} using ${provider}/${selectedModel}`);
 
@@ -208,6 +338,57 @@ async function handleGenerateClick(tweetInfo, resultContainer) {
       const data = await response.json();
       replyContent = data.choices[0].message.content;
 
+    } else if (provider === 'xai') {
+      // xAI (Grok) - OpenAI-compatible API
+      const xaiKey = xaiApiKey['xai-api-key'];
+      if (!xaiKey) throw new Error("xAI API Key missing");
+
+      let userMessageContent;
+
+      // Check if using vision model for image support
+      const isVisionModel = selectedModel.includes('vision');
+
+      if (imageParts.length > 0 && isVisionModel) {
+        // Multimodal format for Grok Vision
+        userMessageContent = [
+          { type: "text", text: `${tweetInfo.handle} wrote: "${tweetInfo.text}"` }
+        ];
+        imageParts.forEach(b64 => {
+          userMessageContent.push({
+            type: "image_url",
+            image_url: {
+              "url": b64
+            }
+          });
+        });
+      } else {
+        // Text only format
+        userMessageContent = `${tweetInfo.handle} wrote: "${tweetInfo.text}"${tweetInfo.mediaContext ? `\n\nMedia/Image Context: ${tweetInfo.mediaContext}` : ''}`;
+      }
+
+      const body = {
+        "messages": [
+          { role: "system", content: gptQuery['gpt-query'] || "You are a ghostwriter and reply to the user's tweets by talking directly to the person, you must keep it short, exclude hashtags." },
+          { role: "user", content: userMessageContent }
+        ],
+        model: selectedModel,
+        temperature: 1,
+        max_tokens: 4096
+      };
+
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + xaiKey
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) throw new Error((await response.json()).error?.message || "xAI API Error");
+      const data = await response.json();
+      replyContent = data.choices[0].message.content;
+
     } else {
       // Gemini
       const geminiKey = geminiApiKey['gemini-api-key'];
@@ -260,13 +441,6 @@ async function handleGenerateClick(tweetInfo, resultContainer) {
     // Display Result
     resultContainer.innerHTML = '';
 
-    // Stats increment logic removed from here.
-    // Moved to content-window-exit.js to count on actual send.
-
-    // Link to auto-fill reply
-    // Link to auto-fill reply
-    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(replyContent)}&in_reply_to=${tweetInfo.id}`;
-
     // Editable Textarea
     const textarea = document.createElement('textarea');
     textarea.value = replyContent;
@@ -279,26 +453,149 @@ async function handleGenerateClick(tweetInfo, resultContainer) {
       textarea.addEventListener(evt, (e) => e.stopPropagation());
     });
 
-    // Dynamic Send Button
-    const sendBtn = document.createElement('button');
-    sendBtn.textContent = 'Send Reply';
-    sendBtn.style.cssText = 'background-color: #1d9bf0; color: white; padding: 6px 12px; border: none; border-radius: 9999px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-block;';
+    // Copy to Clipboard Button
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 Copy';
+    copyBtn.style.cssText = 'background-color: #333; color: white; padding: 6px 12px; border: none; border-radius: 9999px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-block; margin-right: 8px;';
 
-    // Stop bubbling for the button too
-    ['click', 'mousedown', 'mouseup'].forEach(evt => {
-      sendBtn.addEventListener(evt, (e) => e.stopPropagation());
-    });
-
-    sendBtn.onclick = (e) => {
+    copyBtn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      navigator.clipboard.writeText(textarea.value);
+      copyBtn.textContent = '✅ Copied!';
+      setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
+    };
+
+    // Open Native Reply Button
+    const replyBtn = document.createElement('button');
+    replyBtn.textContent = '💬 Reply';
+    replyBtn.style.cssText = 'background-color: #1d9bf0; color: white; padding: 6px 12px; border: none; border-radius: 9999px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-block;';
+
+    // Stop bubbling for the buttons
+    ['click', 'mousedown', 'mouseup'].forEach(evt => {
+      copyBtn.addEventListener(evt, (e) => e.stopPropagation());
+      replyBtn.addEventListener(evt, (e) => e.stopPropagation());
+    });
+
+    replyBtn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
       const finalContent = textarea.value;
-      const finalIntentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(finalContent)}&in_reply_to=${tweetInfo.id}`;
-      window.open(finalIntentUrl, '_blank');
+
+      // Copy text to clipboard first
+      await navigator.clipboard.writeText(finalContent);
+
+      // Find and click the tweet's native reply button
+      const tweetElement = resultContainer.closest('[data-testid="tweet"]') ||
+        resultContainer.closest('article');
+
+      if (tweetElement) {
+        const nativeReplyBtn = tweetElement.querySelector('[data-testid="reply"]');
+        if (nativeReplyBtn) {
+          nativeReplyBtn.click();
+
+          replyBtn.textContent = '⏳ Opening...';
+
+          // Wait for reply compose box to appear, then paste
+          setTimeout(async () => {
+            // Find the compose box - Twitter uses a draft editor
+            const composeBox = document.querySelector('[data-testid="tweetTextarea_0"]') ||
+              document.querySelector('[role="textbox"][data-testid]') ||
+              document.querySelector('[contenteditable="true"][role="textbox"]') ||
+              document.querySelector('div[data-contents="true"]')?.closest('[contenteditable="true"]');
+
+            if (composeBox) {
+              // Focus the compose box
+              composeBox.focus();
+
+              // Use DataTransfer to simulate paste (works with React)
+              const dataTransfer = new DataTransfer();
+              dataTransfer.setData('text/plain', finalContent);
+
+              const pasteEvent = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: dataTransfer
+              });
+
+              composeBox.dispatchEvent(pasteEvent);
+
+              // If paste didn't work, try direct text insertion
+              setTimeout(() => {
+                if (!composeBox.textContent || composeBox.textContent.trim().length === 0) {
+                  // Fallback: set innerHTML directly for draft-js editors
+                  const textSpan = composeBox.querySelector('span[data-text="true"]') || composeBox;
+                  if (textSpan) {
+                    // For Draft.js editors
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNodeContents(composeBox);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    document.execCommand('insertText', false, finalContent);
+                  }
+                }
+              }, 100);
+
+              replyBtn.textContent = '✅ Ready to send!';
+
+              // Mark as replied for Scout
+              chrome.storage.local.get(['scout-replied-tweets']).then((result) => {
+                const storedIds = result['scout-replied-tweets'] || [];
+                if (!storedIds.includes(tweetInfo.id)) {
+                  storedIds.push(tweetInfo.id);
+                  if (storedIds.length > 100) storedIds.shift();
+                  chrome.storage.local.set({ 'scout-replied-tweets': storedIds });
+                }
+              });
+
+              // Check for auto-send setting and click the tweet button
+              chrome.storage.local.get(['auto-send']).then((result) => {
+                if (result['auto-send']) {
+                  setTimeout(() => {
+                    const tweetBtn = document.querySelector('[data-testid="tweetButton"]') ||
+                      document.querySelector('[data-testid="tweetButtonInline"]');
+                    if (tweetBtn && !tweetBtn.disabled) {
+                      tweetBtn.click();
+                      replyBtn.textContent = '✅ Sent!';
+
+                      // Increment daily stats
+                      incrementDailyStats();
+
+                      // Signal Scout to resume
+                      setTimeout(() => {
+                        chrome.storage.local.set({ 'scout-resume-scouting': true });
+                      }, 1000);
+                    }
+                  }, 300);
+                } else {
+                  // If not auto-send, just signal resume for Scout to continue
+                  setTimeout(() => {
+                    chrome.storage.local.set({ 'scout-resume-scouting': true });
+                  }, 500);
+                }
+              });
+
+            } else {
+              replyBtn.textContent = '📋 Copied (paste with Ctrl+V)';
+            }
+
+            setTimeout(() => { replyBtn.textContent = '💬 Reply'; }, 4000);
+          }, 800);
+
+          return;
+        }
+      }
+
+      // Fallback: just copy and notify
+      replyBtn.textContent = '📋 Copied!';
+      setTimeout(() => { replyBtn.textContent = '💬 Reply'; }, 2000);
     };
 
     resultContainer.appendChild(textarea);
-    resultContainer.appendChild(sendBtn);
+    resultContainer.appendChild(copyBtn);
+    resultContainer.appendChild(replyBtn);
 
     // Stop propagation on the container itself just in case
     resultContainer.addEventListener('click', (e) => e.stopPropagation());

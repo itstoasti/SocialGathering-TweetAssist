@@ -1,4 +1,5 @@
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const XAI_API_URL = 'https://api.x.ai/v1';
 
 function getOpenAIModels(apiKey) {
     return fetch('https://api.openai.com/v1/models', {
@@ -39,6 +40,45 @@ async function validateGeminiApiKey() {
         }
     } catch (error) {
         console.error('Error occurred during Gemini API key validation:', error);
+        apiKeyInput.style.borderColor = 'red';
+        selectModels.disabled = true;
+        validateButton.classList.add('invalid');
+    }
+}
+
+async function validateXaiApiKey() {
+    const apiKey = document.getElementById('xai-api-key').value.trim();
+    const apiKeyInput = document.getElementById('xai-api-key');
+    const validateButton = document.getElementById('validate-xai-button');
+    const selectModels = document.getElementById('models-select');
+
+    if (!apiKey) {
+        apiKeyInput.style.borderColor = 'red';
+        validateButton.classList.add('invalid');
+        return;
+    }
+
+    try {
+        // xAI uses OpenAI-compatible API, so we can test with /models endpoint
+        const response = await fetch(`${XAI_API_URL}/models`, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + apiKey
+            }
+        });
+
+        if (response.ok) {
+            apiKeyInput.style.borderColor = 'green';
+            selectModels.disabled = false;
+            loadAndPopulateModels();
+            validateButton.classList.remove('invalid');
+            chrome.storage.local.set({ 'xai-api-key': apiKey });
+            console.log("xAI API key saved");
+        } else {
+            throw new Error('Invalid key');
+        }
+    } catch (error) {
+        console.error('Error occurred during xAI API key validation:', error);
         apiKeyInput.style.borderColor = 'red';
         selectModels.disabled = true;
         validateButton.classList.add('invalid');
@@ -166,6 +206,36 @@ function loadAndPopulateModels() {
                 }
             })
             .catch(console.error);
+    } else if (provider === 'xai') {
+        const apiKey = document.getElementById('xai-api-key').value.trim();
+        if (!apiKey) return;
+
+        // xAI models - from xAI console (https://console.x.ai)
+        const xaiModels = [
+            { id: 'grok-4-1-fast-reasoning', name: 'Grok 4.1 Fast (Reasoning)' },
+            { id: 'grok-4-1-fast-non-reasoning', name: 'Grok 4.1 Fast (Non-Reasoning)' },
+            { id: 'grok-4-fast-reasoning', name: 'Grok 4 Fast (Reasoning)' },
+            { id: 'grok-4-fast-non-reasoning', name: 'Grok 4 Fast (Non-Reasoning)' },
+            { id: 'grok-4-0709', name: 'Grok 4 (0709)' },
+            { id: 'grok-code-fast-1', name: 'Grok Code Fast' },
+            { id: 'grok-3', name: 'Grok 3' },
+            { id: 'grok-3-mini', name: 'Grok 3 Mini' },
+            { id: 'grok-2-vision-1212', name: 'Grok 2 Vision' }
+        ];
+
+        chrome.storage.local.get(['xai-model']).then((res) => {
+            const currentModel = res['xai-model'] || 'grok-4-1-fast-non-reasoning';
+
+            xaiModels.forEach(m => {
+                const option = document.createElement('option');
+                option.value = m.id;
+                option.text = m.name;
+                if (m.id === currentModel) {
+                    option.selected = true;
+                }
+                modelSelect.appendChild(option);
+            });
+        });
     }
 }
 
@@ -173,13 +243,20 @@ function updateProviderUI() {
     const provider = document.getElementById('provider-select').value;
     const openaiConfig = document.getElementById('openai-config');
     const geminiConfig = document.getElementById('gemini-config');
+    const xaiConfig = document.getElementById('xai-config');
 
+    // Hide all configs first
+    openaiConfig.classList.add('hidden');
+    geminiConfig.classList.add('hidden');
+    xaiConfig.classList.add('hidden');
+
+    // Show the selected provider's config
     if (provider === 'gemini') {
-        openaiConfig.classList.add('hidden');
         geminiConfig.classList.remove('hidden');
-    } else {
+    } else if (provider === 'openai') {
         openaiConfig.classList.remove('hidden');
-        geminiConfig.classList.add('hidden');
+    } else if (provider === 'xai') {
+        xaiConfig.classList.remove('hidden');
     }
     loadAndPopulateModels();
 }
@@ -213,12 +290,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    chrome.storage.local.get(['ai-provider', 'open-ai-key', 'gemini-api-key']).then((result) => {
+    chrome.storage.local.get(['ai-provider', 'open-ai-key', 'gemini-api-key', 'xai-api-key']).then((result) => {
         if (result['open-ai-key'] !== undefined) {
             document.getElementById('api-key').value = result['open-ai-key'];
         }
         if (result['gemini-api-key'] !== undefined) {
             document.getElementById('gemini-api-key').value = result['gemini-api-key'];
+        }
+        if (result['xai-api-key'] !== undefined) {
+            document.getElementById('xai-api-key').value = result['xai-api-key'];
         }
 
         const provider = result['ai-provider'] || 'gemini';
@@ -241,12 +321,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('validate-button').addEventListener('click', validateApiKey);
     document.getElementById('validate-gemini-button').addEventListener('click', validateGeminiApiKey);
+    document.getElementById('validate-xai-button').addEventListener('click', validateXaiApiKey);
+
+    document.getElementById('xai-api-key').addEventListener('change', function () {
+        // Save on change for convenience
+        const value = document.getElementById('xai-api-key').value.trim();
+        if (value) {
+            chrome.storage.local.set({ 'xai-api-key': value });
+        }
+    });
 
     document.getElementById('models-select').addEventListener('change', function () {
         const value = document.getElementById('models-select').value;
         const provider = document.getElementById('provider-select').value;
         if (provider === 'openai') {
             chrome.storage.local.set({ 'openai-model': value });
+        } else if (provider === 'xai') {
+            chrome.storage.local.set({ 'xai-model': value });
         } else {
             chrome.storage.local.set({ 'gemini-model': value });
         }
@@ -267,6 +358,15 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('gemini-api-key').setAttribute('type', 'text');
         } else {
             document.getElementById('gemini-api-key').setAttribute('type', 'password');
+        }
+    });
+
+    document.getElementById('show-xai-api-key').addEventListener('click', function (event) {
+        const isChecked = document.getElementById('show-xai-api-key').checked;
+        if (isChecked) {
+            document.getElementById('xai-api-key').setAttribute('type', 'text');
+        } else {
+            document.getElementById('xai-api-key').setAttribute('type', 'password');
         }
     });
 

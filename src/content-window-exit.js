@@ -68,6 +68,30 @@ async function waitForElementsBeforeQuit() {
   console.log("element found");
   await waitForElementRemoval('[data-testid="mask"]')
   console.log("element removed");
+
+  // Signal Scout to resume scouting after the page refreshes
+  // Extract the tweet ID from the URL (in_reply_to parameter)
+  const urlParams = new URLSearchParams(window.location.search);
+  const repliedToId = urlParams.get('in_reply_to');
+
+  if (repliedToId) {
+    console.log("[TweetAssist] Reply sent to tweet:", repliedToId);
+
+    // Mark this tweet as replied in storage
+    chrome.storage.local.get(['scout-replied-tweets']).then((result) => {
+      const storedIds = result['scout-replied-tweets'] || [];
+      if (!storedIds.includes(repliedToId)) {
+        storedIds.push(repliedToId);
+        if (storedIds.length > 100) storedIds.shift();
+        chrome.storage.local.set({ 'scout-replied-tweets': storedIds });
+      }
+    });
+
+    // Set flag to resume scouting when the main page reloads
+    chrome.storage.local.set({ 'scout-resume-scouting': true });
+    console.log("[TweetAssist] Scout resume flag set");
+  }
+
   window.close();
 }
 

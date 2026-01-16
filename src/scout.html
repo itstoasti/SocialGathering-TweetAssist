@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+  <title>Tweet Scout</title>
+  <script src="scout.js"></script>
+</head>
+
+<body>
+  <div class="container fade-in">
+
+    <!-- Header -->
+    <header style="justify-content: start; gap: 15px;">
+      <a href="index.html" class="back-btn" style="text-decoration: none; font-size: 1.2em;">⬅️</a>
+      <div class="logo-area">
+        <span style="font-size: 1.5em;">🔍</span>
+        <h1>Tweet Scout</h1>
+      </div>
+    </header>
+
+    <!-- Status Panel -->
+    <div class="glass-panel scout-status-panel">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 0.9em; opacity: 0.8;">Status</div>
+          <div id="scout-status" style="font-size: 1.1em; font-weight: bold; color: var(--text-muted);">Idle</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.9em; opacity: 0.8;">Matches Found</div>
+          <div id="match-count" style="font-size: 1.5em; font-weight: bold; color: var(--success-color);">0</div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Behavior Settings -->
+    <div class="glass-panel">
+      <div class="section-title">Behavior</div>
+
+      <div class="form-group">
+        <label for="scroll-speed">Scroll Speed</label>
+        <select id="scroll-speed">
+          <option value="slow">🐢 Slow (Safer)</option>
+          <option value="medium" selected>🚶 Medium</option>
+          <option value="fast">🏃 Fast</option>
+        </select>
+      </div>
+
+      <div class="checkbox-wrappers">
+        <label class="checkbox-group">
+          <input type="checkbox" id="pause-on-match" checked>
+          Pause scrolling when a match is found
+        </label>
+        <label class="checkbox-group">
+          <input type="checkbox" id="auto-generate">
+          Auto-generate reply for matches
+        </label>
+        <label class="checkbox-group">
+          <input type="checkbox" id="highlight-matches" checked>
+          Highlight matching tweets
+        </label>
+        <label class="checkbox-group">
+          <input type="checkbox" id="sound-notification">
+          Play sound on match
+        </label>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts -->
+    <div class="glass-panel">
+      <div class="section-title">Keyboard Shortcuts</div>
+      <ul class="shortcut-list">
+        <li>
+          <span class="shortcut-key">Ctrl+Shift+K</span>
+          Toggle Scout On/Off
+        </li>
+        <li>
+          <span class="shortcut-key">Ctrl+Shift+N</span>
+          Skip to Next Match
+        </li>
+      </ul>
+    </div>
+
+    <!-- Instructions -->
+    <div class="glass-panel">
+      <div class="section-title">How to Use</div>
+      <ol style="font-size: 0.85em; padding-left: 20px; line-height: 1.6; color: var(--text-muted);">
+        <li>Configure your filter criteria above</li>
+        <li>Go to <a href="https://x.com/home" target="_blank" style="color: var(--accent-color);">x.com/home</a></li>
+        <li>Look for the floating 🔍 Scout panel</li>
+        <li>Click "Start Scouting" to begin</li>
+        <li>Matching tweets will be highlighted</li>
+      </ol>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <a href="#" style="pointer-events: none;">© 2026 Tweet Assist</a>
+    </footer>
+  </div>
+</body>
+
+</html>

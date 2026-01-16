@@ -40,6 +40,7 @@
                 <select id="provider-select">
                     <option value="gemini">Gemini (Free Tier)</option>
                     <option value="openai">OpenAI</option>
+                    <option value="xai">xAI (Grok)</option>
                 </select>
             </div>
 
@@ -62,6 +63,17 @@
                 </div>
                 <label class="checkbox-group">
                     <input type="checkbox" id="show-gemini-api-key"> Show API Key
+                </label>
+            </div>
+
+            <!-- xAI Config -->
+            <div id="xai-config" class="hidden form-group">
+                <div class="validation-group">
+                    <input type="password" id="xai-api-key" placeholder="xai-...">
+                    <button id="validate-xai-button" class="btn-primary">Validate</button>
+                </div>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="show-xai-api-key"> Show API Key
                 </label>
             </div>
 
