@@ -58,7 +58,6 @@
     }
   ],
   "action": {
-    "default_popup": "src/index.html",
     "default_icon": "src/images/XReplyGPTbg.png"
   }
 }

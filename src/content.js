@@ -6,7 +6,7 @@ function extractTweetInfo(tweetElement) {
   const userElement = tweetElement.querySelector('[data-testid="User-Name"]');
   const textElement = tweetElement.querySelector('[data-testid="tweetText"]');
 
-  if (!userElement || !textElement) return null;
+  if (!userElement) return null;
 
   // Get username (handle)
   const links = userElement.querySelectorAll('a');
@@ -32,16 +32,14 @@ function extractTweetInfo(tweetElement) {
 
   // Get Tweet ID
   let tweetId = '';
-  const statusLink = Array.from(links).find(link => {
+  // Search entire tweet element for status link, not just user block
+  const statusLinks = tweetElement.querySelectorAll('a[href*="/status/"]');
+  for (const link of statusLinks) {
     const href = link.getAttribute('href');
-    return href && href.includes('/status/');
-  });
-
-  if (statusLink) {
-    const parts = statusLink.getAttribute('href').split('/');
-    const statusIndex = parts.indexOf('status');
-    if (statusIndex !== -1 && parts[statusIndex + 1]) {
-      tweetId = parts[statusIndex + 1];
+    const match = href?.match(/\/status\/(\d+)/);
+    if (match) {
+      tweetId = match[1];
+      break;
     }
   }
 
@@ -83,9 +81,12 @@ function extractTweetInfo(tweetElement) {
     mediaContext.push(`[Video: ${label}]`);
   }
 
+  // Require either text OR media to proceed
+  if (!textElement && mediaContext.length === 0 && imageUrls.length === 0) return null;
+
   return {
     handle: handle,
-    text: textElement.innerText,
+    text: textElement ? textElement.innerText : '',
     id: tweetId,
     element: tweetElement,
     mediaContext: mediaContext.join(' '),
@@ -602,7 +603,7 @@ async function handleGenerateClick(tweetInfo, resultContainer) {
 
   } catch (error) {
     console.error(error);
-    resultContainer.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
+    resultContainer.innerHTML = `<span style="background: rgba(255,0,0,0.1); color: #ff4444; padding: 6px; border-radius: 4px; display: inline-block;">Error: ${error.message}</span>`;
   }
 }
 

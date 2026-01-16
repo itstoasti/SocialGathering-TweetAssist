@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Assist Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body>
+    <div class="dashboard-layout">
+
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-content">
+
+                <!-- Logo -->
+                <div class="sidebar-header">
+                    <img src="./images/XReplyGPT.png" alt="Tweet Assist" class="sidebar-logo">
+                    <h1 class="sidebar-title">Tweet Assist</h1>
+                </div>
+
+                <!-- Navigation -->
+                <nav class="sidebar-nav">
+                    <a href="#" class="nav-item active" data-section="dashboard">
+                        <span class="nav-icon">📊</span>
+                        Dashboard
+                    </a>
+                    <a href="https://x.com/home" class="nav-item" target="_blank" id="nav-open-x">
+                        <span class="nav-icon">✖️</span>
+                        Launch X
+                    </a>
+                    <a href="#" class="nav-item" data-section="scout">
+                        <span class="nav-icon">🔍</span>
+                        Scout Info
+                    </a>
+                    <a href="#" class="nav-item" data-section="settings" id="nav-settings">
+                        <span class="nav-icon">⚙️</span>
+                        Settings
+                    </a>
+                </nav>
+
+                <!-- Stats Card -->
+                <div class="sidebar-card stats-card">
+                    <div class="stat-item">
+                        <span class="stat-value" id="replies-today">0</span>
+                        <span class="stat-label">Replies Today</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="matches-found">0</span>
+                        <span class="stat-label">Matches Found</span>
+                    </div>
+                </div>
+
+                <!-- AI Provider Switcher -->
+                <div class="sidebar-card">
+                    <div class="card-header">
+                        <span class="card-title">AI Provider</span>
+                    </div>
+                    <select id="quick-provider-select" class="full-width-select">
+                        <option value="gemini">Gemini</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="xai">xAI (Grok)</option>
+                    </select>
+                </div>
+
+                <!-- System Prompt Section -->
+                <div class="sidebar-card">
+                    <div class="card-header">
+                        <span class="card-title">System Prompt</span>
+                    </div>
+                    <div class="prompt-controls">
+                        <select id="prompt-select">
+                            <option value="custom">Custom</option>
+                        </select>
+                        <button id="save-prompt-btn" class="icon-btn" title="Save prompt">💾</button>
+                        <button id="delete-prompt-btn" class="icon-btn danger" title="Delete prompt">🗑️</button>
+                    </div>
+                    <textarea id="gpt-query" rows="4" placeholder="You are a helpful assistant..."></textarea>
+                </div>
+
+                <!-- Behavior Toggles -->
+                <div class="sidebar-card">
+                    <div class="card-header">
+                        <span class="card-title">Behavior</span>
+                    </div>
+                    <label class="toggle-item">
+                        <input type="checkbox" id="window-close" checked>
+                        <span class="toggle-label">Close window after reply</span>
+                    </label>
+                    <label class="toggle-item">
+                        <input type="checkbox" id="auto-send">
+                        <span class="toggle-label">Auto-send on redirect</span>
+                    </label>
+                </div>
+
+                <!-- Footer Links -->
+                <div class="sidebar-footer">
+                    <a href="https://chrome.google.com/webstore/detail/xreplygpt/ajjgpcaiofpdenhkmabcadabajmimpdk/reviews"
+                        target="_blank">Rate ⭐</a>
+                    <a href="https://github.com/itstoasti/SocialGathering-TweetAssist" target="_blank">GitHub</a>
+                    <a href="changelog.html" target="_blank">Changelog</a>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- Dashboard Section -->
+            <section id="section-dashboard" class="content-section active">
+                <div class="section-header">
+                    <div class="section-header-row">
+                        <div>
+                            <h2>Scout Matches</h2>
+                            <p class="section-subtitle">Tweets that matched your Scout criteria</p>
+                        </div>
+                        <div class="filter-controls">
+                            <label for="filter-status">Filter:</label>
+                            <select id="filter-status">
+                                <option value="all">All Tweets</option>
+                                <option value="not-replied">Not Replied</option>
+                                <option value="replied">Replied</option>
+                            </select>
+                            <button id="auto-scrape-btn" class="btn-auto-scrape">
+                                Auto Scout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="empty-state">
+                    <div class="empty-icon">🔍</div>
+                    <h3>No matches yet</h3>
+                    <p>Start Scout on X.com to find tweets matching your criteria.<br>Matched tweets will appear here.
+                    </p>
+                    <a href="https://x.com/home" target="_blank" class="btn-primary">
+                        Open X.com →
+                    </a>
+                </div>
+
+                <!-- Tweets Grid -->
+                <div id="tweets-grid" class="tweets-grid"></div>
+
+                <!-- Clear Button -->
+                <div id="grid-actions" class="grid-actions hidden">
+                    <button id="clear-matches-btn" class="btn-secondary">
+                        🗑️ Clear All Matches
+                    </button>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="section-settings" class="content-section">
+                <div class="section-header">
+                    <h2>Settings</h2>
+                    <p class="section-subtitle">Configure your AI provider and preferences</p>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- AI Configuration -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-title">AI Configuration</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="provider-select">AI Provider</label>
+                            <select id="provider-select">
+                                <option value="gemini">Gemini</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="xai">xAI (Grok)</option>
+                            </select>
+                        </div>
+
+                        <!-- OpenAI Config -->
+                        <div id="openai-config" class="provider-config hidden">
+                            <div class="form-group">
+                                <label>OpenAI API Key</label>
+                                <div class="input-group">
+                                    <input type="password" id="api-key" placeholder="sk-...">
+                                    <button id="validate-button" class="btn-small">Validate</button>
+                                </div>
+                                <label class="toggle-item small">
+                                    <input type="checkbox" id="show-api-key">
+                                    <span class="toggle-label">Show API Key</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Gemini Config -->
+                        <div id="gemini-config" class="provider-config">
+                            <div class="form-group">
+                                <label>Gemini API Key</label>
+                                <div class="input-group">
+                                    <input type="password" id="gemini-api-key" placeholder="AIza...">
+                                    <button id="validate-gemini-button" class="btn-small">Validate</button>
+                                </div>
+                                <label class="toggle-item small">
+                                    <input type="checkbox" id="show-gemini-api-key">
+                                    <span class="toggle-label">Show API Key</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- xAI Config -->
+                        <div id="xai-config" class="provider-config hidden">
+                            <div class="form-group">
+                                <label>xAI API Key</label>
+                                <div class="input-group">
+                                    <input type="password" id="xai-api-key" placeholder="xai-...">
+                                    <button id="validate-xai-button" class="btn-small">Validate</button>
+                                </div>
+                                <label class="toggle-item small">
+                                    <input type="checkbox" id="show-xai-api-key">
+                                    <span class="toggle-label">Show API Key</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Model Selection -->
+                        <div class="form-group">
+                            <label for="models-select">Select Model</label>
+                            <select id="models-select"></select>
+                        </div>
+                    </div>
+
+                    <!-- Stats Configuration -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-title">Stats Configuration</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="reset-hour">Daily Reset Hour (0-23)</label>
+                            <p class="form-hint">Hour when your "day" restarts. Example: 17 = 5:00 PM</p>
+                            <input type="number" id="reset-hour" min="0" max="23" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Scout Info Section -->
+            <section id="section-scout" class="content-section">
+                <div class="section-header">
+                    <h2>Scout Information</h2>
+                    <p class="section-subtitle">How to use Tweet Scout</p>
+                </div>
+
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-icon">🎯</div>
+                        <h3>Filter Criteria</h3>
+                        <p>Adjust age range and minimum views directly on the floating widget while browsing X.com.</p>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-icon">⌨️</div>
+                        <h3>Keyboard Shortcuts</h3>
+                        <ul class="shortcut-list">
+                            <li><span class="key">Ctrl+Shift+K</span> Toggle Scout On/Off</li>
+                            <li><span class="key">Ctrl+Shift+N</span> Skip to Next Match</li>
+                            <li><span class="key">Ctrl+Shift+L</span> Generate Reply</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-icon">🚀</div>
+                        <h3>Getting Started</h3>
+                        <ol class="steps-list">
+                            <li>Go to <a href="https://x.com/home" target="_blank">x.com/home</a></li>
+                            <li>Look for the floating 🔍 Scout panel</li>
+                            <li>Configure your filters</li>
+                            <li>Click "Start" to begin scouting</li>
+                            <li>Matching tweets will be highlighted</li>
+                        </ol>
+                    </div>
+
+                    <!-- Scout Behavior Settings -->
+                    <div class="info-card wide">
+                        <div class="info-icon">⚙️</div>
+                        <h3>Scout Behavior</h3>
+                        <div class="scout-settings">
+                            <div class="form-group">
+                                <label for="scroll-speed">Scroll Speed</label>
+                                <select id="scroll-speed">
+                                    <option value="slow">🐢 Slow (Safer)</option>
+                                    <option value="medium" selected>🚶 Medium</option>
+                                    <option value="fast">🏃 Fast</option>
+                                </select>
+                            </div>
+                            <div class="toggle-grid">
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="pause-on-match" checked>
+                                    <span class="toggle-label">Pause on match</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="auto-generate">
+                                    <span class="toggle-label">Auto-generate reply</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="highlight-matches" checked>
+                                    <span class="toggle-label">Highlight matches</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="sound-notification">
+                                    <span class="toggle-label">Sound notification</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+
+</html>

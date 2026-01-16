@@ -136,6 +136,35 @@
     }
   }
 
+  // Auto-Scrape Mode
+  let autoScrapeMode = false;
+  let autoScrapeTarget = 10;
+  let autoScrapeCount = 0;
+
+  // Listen for auto-scrape message
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.action === 'start-auto-scrape') {
+      console.log('[Scout] Auto-scrape started, target:', message.count);
+      autoScrapeMode = true;
+      autoScrapeTarget = message.count || 10;
+      autoScrapeCount = 0;
+
+      // Start scouting if not already running
+      if (!isScoutingActive) {
+        // Force settings for auto-scrape
+        settings.pauseOnMatch = false; // Don't pause, just collect
+        settings.highlightMatches = true;
+
+        startScouting();
+
+        // Ensure panel is open to show progress
+        if (panel && panel.classList.contains('minimized')) {
+          toggleMinimize();
+        }
+      }
+    }
+  });
+
   // Parse tweet time from the <time> element
   function extractTweetAge(tweetElement) {
     const timeElement = tweetElement.querySelector('time[datetime]');
@@ -247,6 +276,123 @@
     }
     return null;
   }
+
+  // Extract tweet info for dashboard storage
+  function extractTweetInfo(tweetElement) {
+    const tweetId = getTweetId(tweetElement);
+    if (!tweetId) return null;
+
+    // Get handle
+    const userElement = tweetElement.querySelector('[data-testid="User-Name"]');
+    let handle = '';
+    if (userElement) {
+      const links = userElement.querySelectorAll('a');
+      links.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('/') && !href.includes('/status/')) {
+          handle = href.substring(1);
+        }
+      });
+    }
+
+    // Get tweet text
+    const textElement = tweetElement.querySelector('[data-testid="tweetText"]');
+    const text = textElement ? textElement.innerText : '';
+
+    // Get age
+    const ageMinutes = extractTweetAge(tweetElement);
+    let ageStr = '';
+    if (ageMinutes !== null) {
+      if (ageMinutes < 60) {
+        ageStr = `${Math.round(ageMinutes)}m`;
+      } else {
+        ageStr = `${(ageMinutes / 60).toFixed(1)}h`;
+      }
+    }
+
+    // Get views
+    const views = extractViewCount(tweetElement);
+
+    // Extract media URLs (images and video thumbnails)
+    const mediaUrls = [];
+    const seenUrls = new Set();
+
+    // Check if this tweet has a video player
+    const hasVideo = tweetElement.querySelector('[data-testid="videoPlayer"]') !== null;
+
+    // Get video thumbnail first (if video exists)
+    if (hasVideo) {
+      const videoPlayers = tweetElement.querySelectorAll('[data-testid="videoPlayer"]');
+      videoPlayers.forEach(player => {
+        // Get the thumbnail image from videoPlayer
+        const posterImg = player.querySelector('img');
+        if (posterImg && posterImg.src && !seenUrls.has(posterImg.src)) {
+          seenUrls.add(posterImg.src);
+          mediaUrls.push({ type: 'video', url: posterImg.src });
+        } else {
+          // Fallback to video poster attribute
+          const video = player.querySelector('video');
+          if (video && video.poster && !seenUrls.has(video.poster)) {
+            seenUrls.add(video.poster);
+            mediaUrls.push({ type: 'video', url: video.poster });
+          }
+        }
+      });
+    } // End video capture
+
+    // Always check for photo images (allow mixed media)
+    const photos = tweetElement.querySelectorAll('[data-testid="tweetPhoto"] img');
+    photos.forEach(img => {
+      const src = img.src;
+      if (src && src.includes('pbs.twimg.com') && !seenUrls.has(src)) {
+        seenUrls.add(src);
+        const largerSrc = src.replace(/&name=\w+$/, '&name=medium');
+        mediaUrls.push({ type: 'image', url: largerSrc });
+      }
+    });
+
+    // Get card images (link previews) - but not if already have media
+    if (mediaUrls.length === 0) {
+      const cardImages = tweetElement.querySelectorAll('[data-testid="card.wrapper"] img');
+      cardImages.forEach(img => {
+        if (img.src && img.src.includes('pbs.twimg.com') && !seenUrls.has(img.src)) {
+          seenUrls.add(img.src);
+          mediaUrls.push({ type: 'card', url: img.src });
+        }
+      });
+    }
+
+    return {
+      id: tweetId,
+      handle: handle,
+      text: text.substring(0, 500),
+      age: ageStr,
+      views: views,
+      mediaUrls: mediaUrls.slice(0, 4), // Max 4 media items
+      timestamp: Date.now()
+    };
+  }
+
+  // Store matched tweet for dashboard
+  async function storeMatchedTweet(tweetInfo) {
+    if (!tweetInfo) return;
+
+    const result = await chrome.storage.local.get(['scout-matched-tweets']);
+    const tweets = result['scout-matched-tweets'] || [];
+
+    // Check if already stored
+    if (tweets.some(t => t.id === tweetInfo.id)) return;
+
+    // Add to beginning of array
+    tweets.unshift(tweetInfo);
+
+    // Keep only last 50 matches
+    if (tweets.length > 50) tweets.pop();
+
+    await chrome.storage.local.set({ 'scout-matched-tweets': tweets });
+    console.log('[Scout] Stored matched tweet for dashboard:', tweetInfo.id);
+  }
+
 
   // Check if tweet matches filter criteria
   function meetsFilterCriteria(tweetElement) {
@@ -372,15 +518,35 @@
         matchCount++;
         updateMatchCount();
 
+        // Store tweet info for dashboard
+        const tweetInfo = extractTweetInfo(tweet);
+        storeMatchedTweet(tweetInfo);
+
         highlightTweet(tweet);
         playNotificationSound();
 
-        if (settings.pauseOnMatch) {
+        if (settings.pauseOnMatch && !autoScrapeMode) {
           stopScouting();
           // Scroll the matched tweet into view
           tweet.scrollIntoView({ behavior: 'smooth', block: 'center' });
           updateStatus('Paused');
           return true; // Found a match
+        }
+
+        // Handle Auto-Scrape Mode
+        if (autoScrapeMode) {
+          autoScrapeCount++;
+          console.log(`[Scout] Auto-scrape progress: ${autoScrapeCount}/${autoScrapeTarget}`);
+
+          if (autoScrapeCount >= autoScrapeTarget) {
+            console.log('[Scout] Auto-scrape target reached! Stopping...');
+            stopScouting();
+            updateStatus('Completed');
+
+            // Notify background script to close tab
+            chrome.runtime.sendMessage({ action: 'auto-scrape-done' });
+            return true;
+          }
         }
 
         if (settings.autoGenerate) {
@@ -400,7 +566,7 @@
   function doScroll() {
     window.scrollBy({
       top: 400,
-      behavior: 'smooth'
+      behavior: autoScrapeMode ? 'auto' : 'smooth' // Use instant scroll for auto-scrape (better for background)
     });
 
     // Scan after scroll settles
