@@ -57,7 +57,136 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.runtime.sendMessage({ action: 'auto-scrape-complete' });
   }
 
+  // Handle opening compose window for posting
+  if (message.action === 'open-compose-window') {
+    chrome.tabs.create({
+      url: 'https://x.com/compose/post',
+      active: true
+    }, (tab) => {
+      // Wait for page to fully load, then inject the post content
+      chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+        if (tabId === tab.id && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+
+          // Small delay to ensure the compose modal is ready
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { action: 'inject-post-content' });
+          }, 1500);
+        }
+      });
+    });
+    sendResponse({ success: true });
+  }
+
+  // Handle scheduling a post with alarm
+  if (message.action === 'schedule-post-alarm') {
+    const alarmName = `scheduled-post-${message.postId}`;
+    const scheduledTime = message.scheduledTime;
+
+    // Create alarm - chrome.alarms uses minutes from now or a timestamp
+    chrome.alarms.create(alarmName, {
+      when: scheduledTime
+    });
+
+    console.log(`[TweetAssist] Alarm created: ${alarmName} for ${new Date(scheduledTime).toLocaleString()}`);
+    sendResponse({ success: true });
+  }
+
+  // Handle canceling a scheduled post alarm
+  if (message.action === 'cancel-post-alarm') {
+    const alarmName = `scheduled-post-${message.postId}`;
+    chrome.alarms.clear(alarmName);
+    console.log(`[TweetAssist] Alarm canceled: ${alarmName}`);
+    sendResponse({ success: true });
+  }
+
   return true;
+});
+
+// ============================================
+// Alarm Listener - Triggers when scheduled post is due
+// ============================================
+
+// Track processing posts using storage to prevent duplicates
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (!alarm.name.startsWith('scheduled-post-')) return;
+
+  const postId = alarm.name.replace('scheduled-post-', '');
+  console.log(`[TweetAssist] Alarm fired for post: ${postId}`);
+
+  // Prevent duplicate processing using storage lock (survives SW restarts)
+  const lockKey = `processing_post_${postId}`;
+  const lockResult = await chrome.storage.local.get([lockKey]);
+  const lockTimestamp = lockResult[lockKey];
+
+  if (lockTimestamp && (Date.now() - lockTimestamp < 60000)) {
+    console.log(`[TweetAssist] Post ${postId} is locked (processing). Ignoring duplicate alarm.`);
+    return;
+  }
+
+  // Set lock
+  await chrome.storage.local.set({ [lockKey]: Date.now() });
+
+  try {
+    // Get the scheduled post from storage
+    const result = await chrome.storage.local.get(['scheduled-posts']);
+    const scheduledPosts = result['scheduled-posts'] || [];
+    const post = scheduledPosts.find(p => p.id === postId);
+
+    if (!post) {
+      console.log(`[TweetAssist] Post not found: ${postId}`);
+      await chrome.storage.local.remove([lockKey]);
+      return;
+    }
+
+    // Set as pending post
+    await chrome.storage.local.set({
+      'pending-post': {
+        text: post.text,
+        mediaBase64: post.mediaBase64,
+        mediaName: post.mediaName,
+        timestamp: Date.now()
+      }
+    });
+
+    // Add to posted history BEFORE removing from scheduled
+    const historyResult = await chrome.storage.local.get(['posted-history']);
+    const postedHistory = historyResult['posted-history'] || [];
+    postedHistory.push({
+      ...post,
+      postedAt: Date.now()
+    });
+    await chrome.storage.local.set({ 'posted-history': postedHistory });
+
+    // Remove from scheduled posts
+    const updatedPosts = scheduledPosts.filter(p => p.id !== postId);
+    await chrome.storage.local.set({ 'scheduled-posts': updatedPosts });
+
+    // Open compose window
+    chrome.tabs.create({
+      url: 'https://x.com/compose/post',
+      active: true
+    }, (tab) => {
+      chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+        if (tabId === tab.id && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { action: 'inject-post-content' });
+
+            // Clean up lock after a delay
+            setTimeout(() => {
+              chrome.storage.local.remove([lockKey]);
+            }, 10000);
+          }, 2000);
+        }
+      });
+    });
+
+    console.log(`[TweetAssist] Scheduled post ${postId} triggered successfully`);
+  } catch (error) {
+    console.error(`[TweetAssist] Error processing scheduled post:`, error);
+    await chrome.storage.local.remove([lockKey]);
+  }
 });
 
 chrome.commands.onCommand.addListener((command) => {

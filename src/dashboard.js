@@ -542,6 +542,17 @@ document.addEventListener('DOMContentLoaded', function () {
                         </div>
                         <div class="tweet-content">
                             <p class="tweet-text-full">${escapeHtml(tweet.text || '')}</p>
+                            ${tweet.quotedTweet ? `
+                            <div class="quoted-tweet-card">
+                                <div class="quoted-header">
+                                    <div class="quoted-avatar">${(tweet.quotedTweet.handle || 'U').charAt(0).toUpperCase()}</div>
+                                    <div class="quoted-info">
+                                        <span class="quoted-handle">@${tweet.quotedTweet.handle}</span>
+                                    </div>
+                                </div>
+                                <div class="quoted-text">${escapeHtml(tweet.quotedTweet.text || '')}</div>
+                            </div>
+                            ` : ''}
                             ${mediaHtml}
                         </div>
                         <div class="tweet-stats-row">
@@ -586,5 +597,534 @@ document.addEventListener('DOMContentLoaded', function () {
             loadMatchedTweets();
         }
     });
+
+    // ============================================
+    // Calendar Post Composer
+    // ============================================
+
+    const composerTextarea = document.querySelector('.composer-textarea');
+    const charCountSpan = document.getElementById('char-count');
+    const mediaUploadZone = document.getElementById('media-upload-zone');
+    const mediaInput = document.getElementById('media-input');
+    const schedulePostBtn = document.getElementById('schedule-post-btn');
+    const newPostBtn = document.getElementById('new-post-btn');
+
+    // Character counter
+    if (composerTextarea && charCountSpan) {
+        composerTextarea.addEventListener('input', () => {
+            charCountSpan.textContent = composerTextarea.value.length;
+        });
+    }
+
+    // Media upload handling
+    let pendingMediaBase64 = null;
+    let pendingMediaName = null;
+
+    if (mediaUploadZone && mediaInput) {
+        // Click to upload
+        mediaUploadZone.addEventListener('click', () => {
+            mediaInput.click();
+        });
+
+        // Drag and drop
+        mediaUploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            mediaUploadZone.classList.add('drag-over');
+        });
+
+        mediaUploadZone.addEventListener('dragleave', () => {
+            mediaUploadZone.classList.remove('drag-over');
+        });
+
+        mediaUploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            mediaUploadZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleMediaFile(file);
+            }
+        });
+
+        // File input change
+        mediaInput.addEventListener('change', () => {
+            const file = mediaInput.files[0];
+            if (file) {
+                handleMediaFile(file);
+            }
+        });
+    }
+
+    function handleMediaFile(file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+            pendingMediaBase64 = reader.result;
+            pendingMediaName = file.name;
+
+            // Show preview
+            mediaUploadZone.innerHTML = `
+                <div class="media-preview">
+                    <img src="${reader.result}" alt="Preview" style="max-width: 100%; max-height: 120px; border-radius: 8px;">
+                    <div class="media-preview-name">${file.name}</div>
+                    <button class="remove-media-btn" type="button">✕ Remove</button>
+                </div>
+            `;
+
+            // Add remove handler
+            mediaUploadZone.querySelector('.remove-media-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                clearMediaUpload();
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearMediaUpload() {
+        pendingMediaBase64 = null;
+        pendingMediaName = null;
+        mediaUploadZone.innerHTML = `
+            <div class="upload-placeholder">
+                <span class="upload-icon">🖼️</span>
+                <span>Drop image or click to upload</span>
+                <span class="upload-hint">PNG, JPG, GIF up to 5MB</span>
+            </div>
+        `;
+    }
+
+    // Schedule Post button
+    if (schedulePostBtn) {
+        schedulePostBtn.addEventListener('click', async () => {
+            const tweetText = composerTextarea?.value?.trim() || '';
+            const scheduleDateInput = document.getElementById('schedule-date');
+            const scheduleTimeInput = document.getElementById('schedule-time');
+
+            if (!tweetText && !pendingMediaBase64) {
+                alert('Please add some text or an image to post.');
+                return;
+            }
+
+            // Get scheduled date/time
+            const scheduleDate = scheduleDateInput?.value;
+            const scheduleTime = scheduleTimeInput?.value;
+
+            if (!scheduleDate || !scheduleTime) {
+                alert('Please select a date and time for your scheduled post.');
+                return;
+            }
+
+            // Parse the scheduled time
+            const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+            const now = new Date();
+
+            if (scheduledDateTime <= now) {
+                alert('Please select a future date and time.');
+                return;
+            }
+
+            // Create unique post ID
+            const postId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // Build post object
+            const newPost = {
+                id: postId,
+                text: tweetText,
+                mediaBase64: pendingMediaBase64,
+                mediaName: pendingMediaName,
+                scheduledTime: scheduledDateTime.getTime(),
+                createdAt: Date.now()
+            };
+
+            // Get existing scheduled posts and add new one
+            const result = await chrome.storage.local.get(['scheduled-posts']);
+            const scheduledPosts = result['scheduled-posts'] || [];
+            scheduledPosts.push(newPost);
+            await chrome.storage.local.set({ 'scheduled-posts': scheduledPosts });
+
+            // Send message to service worker to create alarm
+            chrome.runtime.sendMessage({
+                action: 'schedule-post-alarm',
+                postId: postId,
+                scheduledTime: scheduledDateTime.getTime()
+            });
+
+            // Clear the form
+            if (composerTextarea) composerTextarea.value = '';
+            if (charCountSpan) charCountSpan.textContent = '0';
+            if (scheduleDateInput) scheduleDateInput.value = '';
+            if (scheduleTimeInput) scheduleTimeInput.value = '';
+            clearMediaUpload();
+
+            // Refresh the scheduled posts display
+            loadScheduledPosts();
+
+            // Update calendar highlights
+            highlightDaysWithPosts();
+
+            schedulePostBtn.textContent = '✅ Scheduled!';
+            setTimeout(() => {
+                schedulePostBtn.innerHTML = '<span>📅</span> Schedule Post';
+            }, 2000);
+        });
+    }
+
+    // New Post button (scrolls to composer or focuses textarea)
+    if (newPostBtn && composerTextarea) {
+        newPostBtn.addEventListener('click', () => {
+            composerTextarea.focus();
+            composerTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }
+
+    // ============================================
+    // Load and Display Scheduled Posts
+    // ============================================
+
+    async function loadScheduledPosts() {
+        const postsList = document.querySelector('.posts-list');
+        if (!postsList) return;
+
+        const result = await chrome.storage.local.get(['scheduled-posts']);
+        const scheduledPosts = result['scheduled-posts'] || [];
+
+        // Sort by scheduled time (soonest first)
+        scheduledPosts.sort((a, b) => a.scheduledTime - b.scheduledTime);
+
+        // Filter out past posts (cleanup)
+        const now = Date.now();
+        const futurePosts = scheduledPosts.filter(p => p.scheduledTime > now);
+
+        if (futurePosts.length === 0) {
+            postsList.innerHTML = `
+                <div class="empty-posts">
+                    <p>No scheduled posts yet. Create one above!</p>
+                </div>
+            `;
+            return;
+        }
+
+        postsList.innerHTML = futurePosts.map(post => {
+            const dateObj = new Date(post.scheduledTime);
+            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const timeStr = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const hasMedia = post.mediaBase64 ? '<div class="post-media-preview">🖼️ 1 image attached</div>' : '';
+
+            return `
+                <div class="scheduled-post-card" data-post-id="${post.id}">
+                    <div class="post-time">
+                        <span class="post-date">${dateStr}</span>
+                        <span class="post-hour">${timeStr}</span>
+                    </div>
+                    <div class="post-content">
+                        <p>${escapeHtml(post.text || '').substring(0, 100)}${post.text?.length > 100 ? '...' : ''}</p>
+                        ${hasMedia}
+                    </div>
+                    <div class="post-actions">
+                        <button class="icon-btn post-now-btn" title="Post Now">🚀</button>
+                        <button class="icon-btn danger delete-post-btn" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add event listeners for post actions
+        postsList.querySelectorAll('.delete-post-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const card = e.target.closest('.scheduled-post-card');
+                const postId = card.dataset.postId;
+                if (confirm('Delete this scheduled post?')) {
+                    await deleteScheduledPost(postId);
+                    loadScheduledPosts();
+                }
+            });
+        });
+
+        postsList.querySelectorAll('.post-now-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const card = e.target.closest('.scheduled-post-card');
+                const postId = card.dataset.postId;
+                await postNow(postId);
+            });
+        });
+    }
+
+    async function deleteScheduledPost(postId) {
+        const result = await chrome.storage.local.get(['scheduled-posts']);
+        let scheduledPosts = result['scheduled-posts'] || [];
+        scheduledPosts = scheduledPosts.filter(p => p.id !== postId);
+        await chrome.storage.local.set({ 'scheduled-posts': scheduledPosts });
+
+        // Also clear the alarm
+        chrome.runtime.sendMessage({ action: 'cancel-post-alarm', postId: postId });
+    }
+
+    async function postNow(postId) {
+        const result = await chrome.storage.local.get(['scheduled-posts']);
+        const scheduledPosts = result['scheduled-posts'] || [];
+        const post = scheduledPosts.find(p => p.id === postId);
+
+        if (!post) {
+            alert('Post not found.');
+            return;
+        }
+
+        // Store as pending post and open compose
+        await chrome.storage.local.set({
+            'pending-post': {
+                text: post.text,
+                mediaBase64: post.mediaBase64,
+                mediaName: post.mediaName,
+                timestamp: Date.now()
+            }
+        });
+
+        // Add to posted history BEFORE removing
+        const historyResult = await chrome.storage.local.get(['posted-history']);
+        const postedHistory = historyResult['posted-history'] || [];
+        postedHistory.push({
+            ...post,
+            postedAt: Date.now()
+        });
+        await chrome.storage.local.set({ 'posted-history': postedHistory });
+
+        // Remove from scheduled posts
+        await deleteScheduledPost(postId);
+        loadScheduledPosts();
+        loadPostedHistory();
+
+        // Open compose window
+        chrome.runtime.sendMessage({ action: 'open-compose-window' });
+    }
+
+    // ============================================
+    // Load and Display Posted History (filtered by date)
+    // ============================================
+
+    let selectedDate = null;
+
+    async function loadPostedHistory(filterDate = null) {
+        const historySection = document.querySelector('.posted-history');
+        const historyList = document.querySelector('.history-list');
+        if (!historyList || !historySection) return;
+
+        // Hide if no date selected
+        if (!filterDate) {
+            historySection.style.display = 'none';
+            return;
+        }
+
+        historySection.style.display = 'block';
+
+        const result = await chrome.storage.local.get(['posted-history']);
+        const postedHistory = result['posted-history'] || [];
+
+        // Filter by selected date
+        const filteredPosts = postedHistory.filter(post => {
+            const postDate = new Date(post.postedAt);
+            return postDate.toDateString() === filterDate.toDateString();
+        });
+
+        // Update header with selected date
+        const header = historySection.querySelector('.upcoming-header');
+        if (header) {
+            const dateStr = filterDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            header.textContent = `📜 Posts on ${dateStr}`;
+        }
+
+        // Sort by posted time (most recent first)
+        filteredPosts.sort((a, b) => b.postedAt - a.postedAt);
+
+        if (filteredPosts.length === 0) {
+            historyList.innerHTML = `
+                <div class="empty-posts">
+                    <p>No posts on this day.</p>
+                </div>
+            `;
+            return;
+        }
+
+        historyList.innerHTML = filteredPosts.map(post => {
+            const dateObj = new Date(post.postedAt);
+            const timeStr = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const hasMedia = post.mediaBase64 ? '<div class="post-media-preview">🖼️ 1 image attached</div>' : '';
+
+            return `
+                <div class="scheduled-post-card posted" data-post-id="${post.id}">
+                    <div class="post-time">
+                        <span class="post-hour">${timeStr}</span>
+                    </div>
+                    <div class="post-content">
+                        <p>${escapeHtml(post.text || '').substring(0, 100)}${post.text?.length > 100 ? '...' : ''}</p>
+                        ${hasMedia}
+                    </div>
+                    <div class="post-actions">
+                        <span class="posted-badge">✅ Posted</span>
+                        <button class="icon-btn danger delete-history-btn" title="Remove from history">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add delete handlers
+        historyList.querySelectorAll('.delete-history-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const card = e.target.closest('.scheduled-post-card');
+                const postId = card.dataset.postId;
+                if (confirm('Remove this post from history?')) {
+                    const result = await chrome.storage.local.get(['posted-history']);
+                    let history = result['posted-history'] || [];
+                    history = history.filter(p => p.id !== postId);
+                    await chrome.storage.local.set({ 'posted-history': history });
+                    loadPostedHistory(selectedDate);
+                }
+            });
+        });
+    }
+
+    // ============================================
+    // Calendar Day Click Handlers
+    // ============================================
+
+    function setupCalendarDayClicks() {
+        const calendarDays = document.querySelectorAll('.calendar-day:not(.other-month)');
+
+        calendarDays.forEach(day => {
+            day.addEventListener('click', () => {
+                // Remove selection from other days
+                document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
+
+                // Select this day
+                day.classList.add('selected');
+
+                // Get the day number
+                const dayNumber = parseInt(day.querySelector('.day-number')?.textContent || '1');
+
+                // Get current month/year from the title
+                const monthTitle = document.getElementById('calendar-month-title')?.textContent || 'January 2026';
+                const [monthName, yearStr] = monthTitle.split(' ');
+                const year = parseInt(yearStr);
+                const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+
+                // Create date object for selected day
+                selectedDate = new Date(year, monthIndex, dayNumber);
+
+                // Load history for that date
+                loadPostedHistory(selectedDate);
+            });
+        });
+    }
+
+    // ============================================
+    // Highlight Days with Posts (dynamic)
+    // ============================================
+
+    async function highlightDaysWithPosts() {
+        const result = await chrome.storage.local.get(['scheduled-posts', 'posted-history']);
+        const scheduledPosts = result['scheduled-posts'] || [];
+        const postedHistory = result['posted-history'] || [];
+
+        // Get current month/year from calendar title
+        const monthTitle = document.getElementById('calendar-month-title')?.textContent || 'January 2026';
+        const [monthName, yearStr] = monthTitle.split(' ');
+        const year = parseInt(yearStr);
+        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+
+        // Count posts per day
+        const postsPerDay = {};
+
+        // Check scheduled posts
+        scheduledPosts.forEach(post => {
+            const date = new Date(post.scheduledTime);
+            if (date.getMonth() === monthIndex && date.getFullYear() === year) {
+                const day = date.getDate();
+                postsPerDay[day] = (postsPerDay[day] || 0) + 1;
+            }
+        });
+
+        // Check posted history
+        postedHistory.forEach(post => {
+            const date = new Date(post.postedAt);
+            if (date.getMonth() === monthIndex && date.getFullYear() === year) {
+                const day = date.getDate();
+                postsPerDay[day] = (postsPerDay[day] || 0) + 1;
+            }
+        });
+
+        // Update calendar days
+        const calendarDays = document.querySelectorAll('.calendar-day:not(.other-month)');
+        calendarDays.forEach(dayEl => {
+            const dayNumber = parseInt(dayEl.querySelector('.day-number')?.textContent || '0');
+
+            // Remove existing indicators
+            dayEl.classList.remove('has-posts');
+            const existingIndicator = dayEl.querySelector('.day-posts');
+            if (existingIndicator) existingIndicator.remove();
+
+            // Add if has posts
+            if (postsPerDay[dayNumber]) {
+                dayEl.classList.add('has-posts');
+                const count = postsPerDay[dayNumber];
+                const indicator = document.createElement('div');
+                indicator.className = 'day-posts';
+                indicator.innerHTML = `<div class="post-indicator">🐦 ${count} post${count > 1 ? 's' : ''}</div>`;
+                dayEl.appendChild(indicator);
+            }
+        });
+    }
+
+    // Load scheduled posts on page load
+    loadScheduledPosts();
+
+    // Setup calendar day click handlers
+    setupCalendarDayClicks();
+
+    // Hide history by default (no date selected)
+    loadPostedHistory(null);
+
+    // Highlight days with posts
+    highlightDaysWithPosts();
+
+    // Mark today on the calendar
+    markTodayOnCalendar();
+
+    // ============================================
+    // Mark Today on Calendar (dynamic)
+    // ============================================
+
+    function markTodayOnCalendar() {
+        const today = new Date();
+        const todayDay = today.getDate();
+        const todayMonth = today.getMonth();
+        const todayYear = today.getFullYear();
+
+        // Get current calendar month/year
+        const monthTitle = document.getElementById('calendar-month-title')?.textContent || 'January 2026';
+        const [monthName, yearStr] = monthTitle.split(' ');
+        const calendarYear = parseInt(yearStr);
+        const calendarMonth = new Date(`${monthName} 1, ${calendarYear}`).getMonth();
+
+        // Only mark if viewing current month
+        if (calendarMonth !== todayMonth || calendarYear !== todayYear) {
+            return;
+        }
+
+        // Find and mark today's day
+        const calendarDays = document.querySelectorAll('.calendar-day:not(.other-month)');
+        calendarDays.forEach(dayEl => {
+            const dayNumber = parseInt(dayEl.querySelector('.day-number')?.textContent || '0');
+
+            // Remove existing today markers
+            dayEl.classList.remove('today');
+            const existingLabel = dayEl.querySelector('.today-label');
+            if (existingLabel) existingLabel.remove();
+
+            // Add today marker
+            if (dayNumber === todayDay) {
+                dayEl.classList.add('today');
+                const label = document.createElement('div');
+                label.className = 'today-label';
+                label.textContent = 'Today';
+                dayEl.appendChild(label);
+            }
+        });
+    }
 
 });

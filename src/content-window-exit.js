@@ -149,21 +149,19 @@ chrome.storage.local.get(['automatic-window-close', 'auto-send']).then((result) 
     });
   };
 
-  // Attach listener for manual clicks (if auto-send is off or fails)
-  waitForElement('[data-testid="tweetButton"]').then((btn) => {
-    // Use 'mousedown' as 'click' might be intercepted or prevented by Twitter's own handlers
-    // But verify it's a real user action or our simulated one.
-    btn.addEventListener('click', incrementStats);
-  });
+  // Attach listener for MANUAL clicks only (when auto-send is off)
+  // When auto-send is on, content.js handles the increment directly
+  if (!result['auto-send']) {
+    waitForElement('[data-testid="tweetButton"]').then((btn) => {
+      btn.addEventListener('click', incrementStats);
+      console.log('[TweetAssist] Manual send click listener attached');
+    });
+  }
 
   // Handle Auto-Send
   if (result['auto-send']) {
     performAutoSend().then(() => {
-      // Increment stats for auto-send cases too?
-      // Wait, if we attach the listener above, the auto-send click() should trigger it.
-      // But to be safe and avoid race conditions or event suppression:
-      // Let's rely on the listener if possible, but the `performAutoSend` function
-      // waits to find the button.
+      // Stats are incremented by content.js when auto-send clicks the button
     });
   }
 

@@ -362,13 +362,53 @@
       });
     }
 
+    // Check for quoted tweet
+    let quotedTweet = null;
+    const userNames = tweetElement.querySelectorAll('[data-testid="User-Name"]');
+    if (userNames.length > 1) {
+      const quotedUserElement = userNames[1];
+      let quotedHandle = '';
+
+      const qLinks = quotedUserElement.querySelectorAll('a');
+      qLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('/') && !href.includes('/status/')) {
+          quotedHandle = href.substring(1);
+        }
+      });
+
+      // Fallback for handle
+      if (!quotedHandle) {
+        const qSpans = quotedUserElement.querySelectorAll('span');
+        for (let span of qSpans) {
+          if (span.innerText.startsWith('@')) {
+            quotedHandle = span.innerText.substring(1);
+            break;
+          }
+        }
+      }
+
+      // Get quoted text (usually the second tweetText element)
+      const textElements = tweetElement.querySelectorAll('[data-testid="tweetText"]');
+      const quotedTextElement = textElements.length > 1 ? textElements[1] : null;
+      const quotedText = quotedTextElement ? quotedTextElement.innerText : '';
+
+      if (quotedHandle) {
+        quotedTweet = {
+          handle: quotedHandle,
+          text: quotedText
+        };
+      }
+    }
+
     return {
       id: tweetId,
       handle: handle,
       text: text.substring(0, 500),
       age: ageStr,
       views: views,
-      mediaUrls: mediaUrls.slice(0, 4), // Max 4 media items
+      mediaUrls: mediaUrls.slice(0, 4),
+      quotedTweet: quotedTweet, // <--- Added field
       timestamp: Date.now()
     };
   }

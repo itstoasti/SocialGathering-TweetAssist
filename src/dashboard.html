@@ -31,9 +31,13 @@
                         <span class="nav-icon">✖️</span>
                         Launch X
                     </a>
-                    <a href="#" class="nav-item" data-section="scout">
-                        <span class="nav-icon">🔍</span>
-                        Scout Info
+                    <a href="#" class="nav-item" data-section="calendar">
+                        <span class="nav-icon">📅</span>
+                        Calendar
+                    </a>
+                    <a href="#" class="nav-item" data-section="content-creation">
+                        <span class="nav-icon">🎨</span>
+                        Content Creation
                     </a>
                     <a href="#" class="nav-item" data-section="settings" id="nav-settings">
                         <span class="nav-icon">⚙️</span>
@@ -78,21 +82,6 @@
                         <button id="delete-prompt-btn" class="icon-btn danger" title="Delete prompt">🗑️</button>
                     </div>
                     <textarea id="gpt-query" rows="4" placeholder="You are a helpful assistant..."></textarea>
-                </div>
-
-                <!-- Behavior Toggles -->
-                <div class="sidebar-card">
-                    <div class="card-header">
-                        <span class="card-title">Behavior</span>
-                    </div>
-                    <label class="toggle-item">
-                        <input type="checkbox" id="window-close" checked>
-                        <span class="toggle-label">Close window after reply</span>
-                    </label>
-                    <label class="toggle-item">
-                        <input type="checkbox" id="auto-send">
-                        <span class="toggle-label">Auto-send on redirect</span>
-                    </label>
                 </div>
 
                 <!-- Footer Links -->
@@ -240,76 +229,253 @@
                         </div>
                     </div>
                 </div>
-            </section>
 
-            <!-- Scout Info Section -->
-            <section id="section-scout" class="content-section">
-                <div class="section-header">
-                    <h2>Scout Information</h2>
-                    <p class="section-subtitle">How to use Tweet Scout</p>
+                <!-- Scout Info (moved from separate section) -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <span class="card-title">Scout Information</span>
+                    </div>
+                    <div class="info-cards-inline">
+                        <div class="info-item">
+                            <strong>🎯 Filter Criteria:</strong> Adjust age range and minimum views directly on the
+                            floating widget while browsing X.com.
+                        </div>
+                        <div class="info-item">
+                            <strong>⌨️ Keyboard Shortcuts:</strong>
+                            <ul class="shortcut-list-inline">
+                                <li><span class="key">Ctrl+Shift+K</span> Toggle Scout On/Off</li>
+                                <li><span class="key">Ctrl+Shift+N</span> Skip to Next Match</li>
+                                <li><span class="key">Ctrl+Shift+L</span> Generate Reply</li>
+                            </ul>
+                        </div>
+                        <div class="info-item">
+                            <strong>🚀 Getting Started:</strong> Go to <a href="https://x.com/home"
+                                target="_blank">x.com/home</a>, look for the floating Scout panel, configure your
+                            filters, click "Start" to begin.
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label for="scroll-speed">Scroll Speed</label>
+                        <select id="scroll-speed">
+                            <option value="slow">🐢 Slow (Safer)</option>
+                            <option value="medium" selected>🚶 Medium</option>
+                            <option value="fast">🏃 Fast</option>
+                        </select>
+                    </div>
+                    <div class="toggle-grid">
+                        <label class="toggle-item">
+                            <input type="checkbox" id="pause-on-match" checked>
+                            <span class="toggle-label">Pause on match</span>
+                        </label>
+                        <label class="toggle-item">
+                            <input type="checkbox" id="auto-generate">
+                            <span class="toggle-label">Auto-generate reply</span>
+                        </label>
+                        <label class="toggle-item">
+                            <input type="checkbox" id="highlight-matches" checked>
+                            <span class="toggle-label">Highlight matches</span>
+                        </label>
+                        <label class="toggle-item">
+                            <input type="checkbox" id="sound-notification">
+                            <span class="toggle-label">Sound notification</span>
+                        </label>
+                    </div>
                 </div>
 
-                <div class="info-cards">
-                    <div class="info-card">
-                        <div class="info-icon">🎯</div>
-                        <h3>Filter Criteria</h3>
-                        <p>Adjust age range and minimum views directly on the floating widget while browsing X.com.</p>
+                <!-- Reply Behavior Settings -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <span class="card-title">Reply Behavior</span>
+                    </div>
+                    <div class="toggle-grid">
+                        <label class="toggle-item">
+                            <input type="checkbox" id="window-close" checked>
+                            <span class="toggle-label">Close window after reply</span>
+                        </label>
+                        <label class="toggle-item">
+                            <input type="checkbox" id="auto-send">
+                            <span class="toggle-label">Auto-send on redirect</span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Calendar Section -->
+            <section id="section-calendar" class="content-section">
+                <div class="section-header section-header-row">
+                    <div>
+                        <h2>Content Calendar</h2>
+                        <p class="section-subtitle">Plan and schedule your posts</p>
+                    </div>
+                    <button class="btn-primary" id="new-post-btn">
+                        <span>✏️</span> New Post
+                    </button>
+                </div>
+
+                <div class="calendar-layout">
+                    <!-- Calendar View -->
+                    <div class="calendar-panel">
+                        <!-- Month Navigation -->
+                        <div class="calendar-nav">
+                            <button class="calendar-nav-btn" id="prev-month">←</button>
+                            <h3 class="calendar-month-title" id="calendar-month-title">January 2026</h3>
+                            <button class="calendar-nav-btn" id="next-month">→</button>
+                        </div>
+
+                        <!-- Weekday Headers -->
+                        <div class="calendar-weekdays">
+                            <div class="weekday">Sun</div>
+                            <div class="weekday">Mon</div>
+                            <div class="weekday">Tue</div>
+                            <div class="weekday">Wed</div>
+                            <div class="weekday">Thu</div>
+                            <div class="weekday">Fri</div>
+                            <div class="weekday">Sat</div>
+                        </div>
+
+                        <!-- Calendar Grid -->
+                        <div class="calendar-grid" id="calendar-grid">
+                            <!-- Previous month overflow -->
+                            <div class="calendar-day other-month"><span class="day-number">28</span></div>
+                            <div class="calendar-day other-month"><span class="day-number">29</span></div>
+                            <div class="calendar-day other-month"><span class="day-number">30</span></div>
+                            <div class="calendar-day other-month"><span class="day-number">31</span></div>
+
+                            <!-- Current month -->
+                            <div class="calendar-day"><span class="day-number">1</span></div>
+                            <div class="calendar-day"><span class="day-number">2</span></div>
+                            <div class="calendar-day"><span class="day-number">3</span></div>
+                            <div class="calendar-day"><span class="day-number">4</span></div>
+                            <div class="calendar-day"><span class="day-number">5</span></div>
+                            <div class="calendar-day"><span class="day-number">6</span></div>
+                            <div class="calendar-day"><span class="day-number">7</span></div>
+                            <div class="calendar-day"><span class="day-number">8</span></div>
+                            <div class="calendar-day"><span class="day-number">9</span></div>
+                            <div class="calendar-day"><span class="day-number">10</span></div>
+                            <div class="calendar-day"><span class="day-number">11</span></div>
+                            <div class="calendar-day"><span class="day-number">12</span></div>
+                            <div class="calendar-day"><span class="day-number">13</span></div>
+                            <div class="calendar-day"><span class="day-number">14</span></div>
+                            <div class="calendar-day"><span class="day-number">15</span></div>
+                            <div class="calendar-day"><span class="day-number">16</span></div>
+                            <div class="calendar-day"><span class="day-number">17</span></div>
+                            <div class="calendar-day"><span class="day-number">18</span></div>
+                            <div class="calendar-day"><span class="day-number">19</span></div>
+                            <div class="calendar-day"><span class="day-number">20</span></div>
+                            <div class="calendar-day"><span class="day-number">21</span></div>
+                            <div class="calendar-day"><span class="day-number">22</span></div>
+                            <div class="calendar-day"><span class="day-number">23</span></div>
+                            <div class="calendar-day"><span class="day-number">24</span></div>
+                            <div class="calendar-day"><span class="day-number">25</span></div>
+                            <div class="calendar-day"><span class="day-number">26</span></div>
+                            <div class="calendar-day"><span class="day-number">27</span></div>
+                            <div class="calendar-day"><span class="day-number">28</span></div>
+                            <div class="calendar-day"><span class="day-number">29</span></div>
+                            <div class="calendar-day"><span class="day-number">30</span></div>
+                            <div class="calendar-day"><span class="day-number">31</span></div>
+                        </div>
                     </div>
 
-                    <div class="info-card">
-                        <div class="info-icon">⌨️</div>
-                        <h3>Keyboard Shortcuts</h3>
-                        <ul class="shortcut-list">
-                            <li><span class="key">Ctrl+Shift+K</span> Toggle Scout On/Off</li>
-                            <li><span class="key">Ctrl+Shift+N</span> Skip to Next Match</li>
-                            <li><span class="key">Ctrl+Shift+L</span> Generate Reply</li>
-                        </ul>
-                    </div>
+                    <!-- Post Composer Panel -->
+                    <div class="composer-panel">
+                        <div class="composer-header">
+                            <h3>📝 Compose Tweet</h3>
+                        </div>
 
-                    <div class="info-card">
-                        <div class="info-icon">🚀</div>
-                        <h3>Getting Started</h3>
-                        <ol class="steps-list">
-                            <li>Go to <a href="https://x.com/home" target="_blank">x.com/home</a></li>
-                            <li>Look for the floating 🔍 Scout panel</li>
-                            <li>Configure your filters</li>
-                            <li>Click "Start" to begin scouting</li>
-                            <li>Matching tweets will be highlighted</li>
-                        </ol>
-                    </div>
+                        <div class="composer-body">
+                            <textarea class="composer-textarea" placeholder="What's happening?"
+                                maxlength="280"></textarea>
+                            <div class="composer-char-count"><span id="char-count">0</span>/280</div>
 
-                    <!-- Scout Behavior Settings -->
-                    <div class="info-card wide">
-                        <div class="info-icon">⚙️</div>
-                        <h3>Scout Behavior</h3>
-                        <div class="scout-settings">
-                            <div class="form-group">
-                                <label for="scroll-speed">Scroll Speed</label>
-                                <select id="scroll-speed">
-                                    <option value="slow">🐢 Slow (Safer)</option>
-                                    <option value="medium" selected>🚶 Medium</option>
-                                    <option value="fast">🏃 Fast</option>
-                                </select>
+                            <!-- Media Upload -->
+                            <div class="media-upload-zone" id="media-upload-zone">
+                                <div class="upload-placeholder">
+                                    <span class="upload-icon">🖼️</span>
+                                    <span>Drop image or click to upload</span>
+                                    <span class="upload-hint">PNG, JPG, GIF up to 5MB</span>
+                                </div>
+                                <input type="file" id="media-input" accept="image/*" hidden>
                             </div>
-                            <div class="toggle-grid">
-                                <label class="toggle-item">
-                                    <input type="checkbox" id="pause-on-match" checked>
-                                    <span class="toggle-label">Pause on match</span>
-                                </label>
-                                <label class="toggle-item">
-                                    <input type="checkbox" id="auto-generate">
-                                    <span class="toggle-label">Auto-generate reply</span>
-                                </label>
-                                <label class="toggle-item">
-                                    <input type="checkbox" id="highlight-matches" checked>
-                                    <span class="toggle-label">Highlight matches</span>
-                                </label>
-                                <label class="toggle-item">
-                                    <input type="checkbox" id="sound-notification">
-                                    <span class="toggle-label">Sound notification</span>
-                                </label>
+
+                            <!-- Schedule Options -->
+                            <div class="schedule-options">
+                                <div class="form-group">
+                                    <label>📅 Schedule Date</label>
+                                    <input type="date" class="schedule-date" id="schedule-date">
+                                </div>
+                                <div class="form-group">
+                                    <label>🕐 Time</label>
+                                    <input type="time" class="schedule-time" id="schedule-time">
+                                </div>
                             </div>
                         </div>
+
+                        <div class="composer-footer">
+                            <button class="btn-secondary" id="save-draft-btn">Save Draft</button>
+                            <button class="btn-primary" id="schedule-post-btn">
+                                <span>📅</span> Schedule Post
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upcoming Posts Preview -->
+                <div class="upcoming-posts">
+                    <h3 class="upcoming-header">📋 Upcoming Posts</h3>
+                    <div class="posts-list">
+                        <div class="scheduled-post-card">
+                            <div class="post-time">
+                                <span class="post-date">Jan 17</span>
+                                <span class="post-hour">9:00 AM</span>
+                            </div>
+                            <div class="post-content">
+                                <p>Excited to share our latest update! 🚀 Check out the new features we've been working
+                                    on...
+                                </p>
+                            </div>
+                            <div class="post-actions">
+                                <button class="icon-btn" title="Edit">✏️</button>
+                                <button class="icon-btn danger" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="scheduled-post-card">
+                            <div class="post-time">
+                                <span class="post-date">Jan 17</span>
+                                <span class="post-hour">2:00 PM</span>
+                            </div>
+                            <div class="post-content">
+                                <p>Quick tip: Use keyboard shortcuts to boost your productivity! ⌨️</p>
+                                <div class="post-media-preview">🖼️ 1 image attached</div>
+                            </div>
+                            <div class="post-actions">
+                                <button class="icon-btn" title="Edit">✏️</button>
+                                <button class="icon-btn danger" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Post History -->
+                <div class="posted-history">
+                    <h3 class="upcoming-header">📜 Post History</h3>
+                    <div class="history-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Content Creation Section -->
+            <section id="section-content-creation" class="content-section">
+                <div class="section-header">
+                    <h2>Content Creation</h2>
+                    <p class="section-subtitle">Create engaging content with AI assistance</p>
+                </div>
+
+                <div class="coming-soon-container">
+                    <div class="coming-soon-card">
+                        <span class="coming-soon-icon">🚀</span>
+                        <h3>Coming Soon</h3>
+                        <p>AI-powered content creation tools are on the way. Stay tuned!</p>
                     </div>
                 </div>
             </section>

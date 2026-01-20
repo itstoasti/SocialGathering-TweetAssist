@@ -561,7 +561,7 @@ async function handleGenerateClick(tweetInfo, resultContainer) {
                       tweetBtn.click();
                       replyBtn.textContent = '✅ Sent!';
 
-                      // Increment daily stats
+                      // Increment daily stats directly (click listener not reliable for programmatic clicks)
                       incrementDailyStats();
 
                       // Signal Scout to resume
@@ -692,3 +692,364 @@ setTimeout(() => {
 }, 2000);
 
 // Auto-send logic moved to content-window-exit.js
+
+// ============================================
+// Post Composer Injection (for Calendar feature)
+// ============================================
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'inject-post-content') {
+    injectPostContent();
+    sendResponse({ success: true });
+  }
+  return true;
+});
+
+async function injectPostContent() {
+  try {
+    // Get pending post from storage
+    const result = await chrome.storage.local.get(['pending-post']);
+    const pendingPost = result['pending-post'];
+
+    if (!pendingPost) {
+      console.log('[TweetAssist] No pending post found');
+      return;
+    }
+
+    console.log('[TweetAssist] Injecting post content:', pendingPost.text?.substring(0, 50));
+
+    // Wait for compose box to be ready
+    await waitForElement('[data-testid="tweetTextarea_0"]', 5000);
+
+    // Find the text input area
+    const textArea = document.querySelector('[data-testid="tweetTextarea_0"]');
+    if (!textArea) {
+      console.log('[TweetAssist] Compose textarea not found');
+      return;
+    }
+
+    // 1. Inject Media FIRST
+    if (pendingPost.mediaBase64) {
+      console.log('[TweetAssist] Injecting media first...');
+      await injectMediaFile(pendingPost.mediaBase64, pendingPost.mediaName);
+      await new Promise(r => setTimeout(r, 2500));
+    }
+
+    // 2. Inject Text using DataTransfer paste (from SocialGatheringExtension)
+    if (pendingPost.text) {
+      console.log('[TweetAssist] Injecting text via DataTransfer paste...');
+
+      // Wait for compose box
+      await waitForElement('[data-testid="tweetTextarea_0"]', 5000);
+
+      // Find the DraftJS editor - need to find the CORRECT one in the compose modal
+      // The compose modal has: tweetTextarea_0_label > ... > public-DraftEditor-content
+      let draftJSEditor = null;
+
+      // Strategy 1: Find within the label container (most specific)
+      const labelContainer = document.querySelector('[data-testid="tweetTextarea_0_label"]');
+      if (labelContainer) {
+        draftJSEditor = labelContainer.querySelector('.public-DraftEditor-content[contenteditable="true"]');
+        if (draftJSEditor) console.log('[TweetAssist] Found editor inside tweetTextarea_0_label');
+      }
+
+      // Strategy 2: Find within RichTextInputContainer
+      if (!draftJSEditor) {
+        const richContainer = document.querySelector('[data-testid="tweetTextarea_0RichTextInputContainer"]');
+        if (richContainer) {
+          draftJSEditor = richContainer.querySelector('.public-DraftEditor-content[contenteditable="true"]');
+          if (draftJSEditor) console.log('[TweetAssist] Found editor inside RichTextInputContainer');
+        }
+      }
+
+      // Strategy 3: Find FIRST visible public-DraftEditor-content
+      if (!draftJSEditor) {
+        const allEditors = document.querySelectorAll('.public-DraftEditor-content[contenteditable="true"]');
+        for (const editor of allEditors) {
+          const rect = editor.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            draftJSEditor = editor;
+            console.log('[TweetAssist] Found first visible DraftJS editor');
+            break;
+          }
+        }
+      }
+
+      // Strategy 4: Simple fallback
+      if (!draftJSEditor) {
+        draftJSEditor = document.querySelector('.public-DraftEditor-content[contenteditable="true"]');
+      }
+
+      if (!draftJSEditor) {
+        console.log('[TweetAssist] DraftJS editor not found');
+        return;
+      }
+
+      console.log('[TweetAssist] Found DraftJS editor');
+
+      // Try methods in order of preference (from SocialGatheringExtension)
+      const success = await tryDataTransferPaste(draftJSEditor, pendingPost.text) ||
+        await tryCompositionEvents(draftJSEditor, pendingPost.text) ||
+        await tryClipboardWithEvents(draftJSEditor, pendingPost.text);
+
+      if (!success) {
+        console.log('[TweetAssist] All text injection methods failed');
+      } else {
+        console.log('[TweetAssist] Text injected successfully');
+      }
+
+      // Final wait for React to process
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // Clear pending
+    await chrome.storage.local.remove(['pending-post']);
+    console.log('[TweetAssist] Injection complete');
+
+    // 3. Auto-click Post (Wait for button enable)
+    await autoClickPostButton();
+
+  } catch (error) {
+    console.error('[TweetAssist] Error injecting post:', error);
+  }
+}
+
+// Method 1: DataTransfer paste (most compatible with DraftJS)
+async function tryDataTransferPaste(editor, text) {
+  try {
+    console.log('[TweetAssist] Trying DataTransfer paste...');
+
+    // Focus the editor
+    editor.focus();
+    await new Promise(r => setTimeout(r, 200));
+
+    // Convert newlines to HTML for DraftJS to understand
+    const htmlText = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+
+    // Create DataTransfer object with both plain text and HTML
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', text);
+    dataTransfer.setData('text/html', htmlText);
+
+    // Create a proper paste event
+    const pasteEvent = new ClipboardEvent('paste', {
+      clipboardData: dataTransfer,
+      bubbles: true,
+      cancelable: true
+    });
+
+    // Dispatch the paste event
+    editor.dispatchEvent(pasteEvent);
+
+    await new Promise(r => setTimeout(r, 500));
+
+    // Verify the text was pasted
+    const currentText = editor.textContent || editor.innerText || '';
+    const success = currentText.trim().length > 0 && currentText.includes(text.substring(0, 10));
+
+    console.log(`[TweetAssist] DataTransfer paste: got "${currentText.substring(0, 50)}...", success: ${success}`);
+    return success;
+
+  } catch (error) {
+    console.log('[TweetAssist] Error in DataTransfer paste:', error);
+    return false;
+  }
+}
+
+// Method 2: Composition events (simulates IME input)
+async function tryCompositionEvents(editor, text) {
+  try {
+    console.log('[TweetAssist] Trying composition events...');
+
+    // Focus the editor
+    editor.focus();
+    await new Promise(r => setTimeout(r, 200));
+
+    // Start composition
+    editor.dispatchEvent(new CompositionEvent('compositionstart', {
+      data: '',
+      bubbles: true,
+      cancelable: true
+    }));
+    await new Promise(r => setTimeout(r, 50));
+
+    // Update composition
+    editor.dispatchEvent(new CompositionEvent('compositionupdate', {
+      data: text,
+      bubbles: true,
+      cancelable: true
+    }));
+    await new Promise(r => setTimeout(r, 50));
+
+    // End composition
+    editor.dispatchEvent(new CompositionEvent('compositionend', {
+      data: text,
+      bubbles: true,
+      cancelable: true
+    }));
+
+    // Also dispatch input event
+    editor.dispatchEvent(new InputEvent('input', {
+      data: text,
+      inputType: 'insertCompositionText',
+      bubbles: true,
+      cancelable: true
+    }));
+
+    await new Promise(r => setTimeout(r, 300));
+
+    // Verify
+    const currentText = editor.textContent || editor.innerText || '';
+    const success = currentText.trim().length > 0;
+
+    console.log(`[TweetAssist] Composition events: got "${currentText.substring(0, 50)}...", success: ${success}`);
+    return success;
+
+  } catch (error) {
+    console.log('[TweetAssist] Error in composition events:', error);
+    return false;
+  }
+}
+
+// Method 3: Clipboard with proper event sequence
+async function tryClipboardWithEvents(editor, text) {
+  try {
+    console.log('[TweetAssist] Trying clipboard with events...');
+
+    // Focus the editor
+    editor.focus();
+    await new Promise(r => setTimeout(r, 200));
+
+    // Write to clipboard
+    await navigator.clipboard.writeText(text);
+    await new Promise(r => setTimeout(r, 100));
+
+    // Create proper clipboard data
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', text);
+
+    // Create beforepaste event
+    editor.dispatchEvent(new Event('beforepaste', { bubbles: true, cancelable: true }));
+    await new Promise(r => setTimeout(r, 50));
+
+    // Create paste event
+    const pasteEvent = new ClipboardEvent('paste', {
+      clipboardData: dataTransfer,
+      bubbles: true,
+      cancelable: true
+    });
+
+    editor.dispatchEvent(pasteEvent);
+    await new Promise(r => setTimeout(r, 300));
+
+    // Verify
+    const currentText = editor.textContent || editor.innerText || '';
+    const success = currentText.trim().length > 0;
+
+    console.log(`[TweetAssist] Clipboard with events: got "${currentText.substring(0, 50)}...", success: ${success}`);
+    return success;
+
+  } catch (error) {
+    console.log('[TweetAssist] Error in clipboard with events:', error);
+    return false;
+  }
+}
+
+
+async function autoClickPostButton() {
+  console.log('[TweetAssist] Waiting for Post button to enable...');
+
+  // Wait up to 8 seconds for the button to be ENABLED  
+  let attempts = 0;
+  while (attempts < 40) {
+    const btn = document.querySelector('[data-testid="tweetButton"]');
+    if (btn) {
+      const isDisabled = btn.disabled || btn.getAttribute('aria-disabled') === 'true';
+      if (!isDisabled) {
+        console.log('[TweetAssist] Clicking Post button!');
+        btn.click();
+        return;
+      }
+    }
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+  console.log('[TweetAssist] Timed out waiting for Post button to enable');
+}
+
+
+function waitForElement(selector, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const element = document.querySelector(selector);
+    if (element) {
+      resolve(element);
+      return;
+    }
+
+    const observer = new MutationObserver((mutations, obs) => {
+      const el = document.querySelector(selector);
+      if (el) {
+        obs.disconnect();
+        resolve(el);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+    }, timeout);
+  });
+}
+
+async function injectMediaFile(base64Data, fileName) {
+  try {
+    // Find the file input for media
+    const fileInput = document.querySelector('input[type="file"][accept*="image"]');
+    if (!fileInput) {
+      console.log('[TweetAssist] File input not found, looking for media button...');
+
+      // Try clicking the media button first
+      const mediaButton = document.querySelector('[data-testid="fileInput"]')?.parentElement
+        || document.querySelector('[aria-label*="media" i]')
+        || document.querySelector('[aria-label*="image" i]');
+
+      if (mediaButton) {
+        mediaButton.click();
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    // Look for file input again
+    const input = document.querySelector('input[type="file"][accept*="image"]')
+      || document.querySelector('input[type="file"][data-testid="fileInput"]')
+      || document.querySelector('input[type="file"]');
+
+    if (!input) {
+      console.log('[TweetAssist] Could not find file input for media upload');
+      return;
+    }
+
+    // Convert base64 to File
+    const response = await fetch(base64Data);
+    const blob = await response.blob();
+    const file = new File([blob], fileName || 'image.png', { type: blob.type });
+
+    // Create a DataTransfer to set files
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    input.files = dataTransfer.files;
+
+    // Trigger change event
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    console.log('[TweetAssist] Media file injected');
+  } catch (error) {
+    console.error('[TweetAssist] Error injecting media:', error);
+  }
+}
