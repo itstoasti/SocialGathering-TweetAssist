@@ -1494,3 +1494,119 @@ select {
     margin: 0;
     line-height: 1.5;
 }
+
+/* ============================================
+   Missed Posts Section
+   ============================================ */
+
+.missed-posts-section {
+    margin-top: 32px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(251, 191, 36, 0.05));
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+}
+
+.missed-header {
+    color: #f59e0b !important;
+}
+
+.missed-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: -8px 0 16px 0;
+}
+
+.missed-posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.scheduled-post-card.missed {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.scheduled-post-card.missed:hover {
+    border-color: #f59e0b;
+}
+
+.scheduled-post-card.missed .post-date {
+    color: #f59e0b;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.missed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.reschedule-btn {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #f59e0b;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.reschedule-btn:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+}
+
+/* Reschedule Modal */
+.reschedule-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.reschedule-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+}
+
+.reschedule-modal h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+}
+
+.reschedule-modal .form-group {
+    margin-bottom: 16px;
+}
+
+.reschedule-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}

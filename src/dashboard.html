@@ -383,9 +383,8 @@
                         </div>
 
                         <div class="composer-body">
-                            <textarea class="composer-textarea" placeholder="What's happening?"
-                                maxlength="280"></textarea>
-                            <div class="composer-char-count"><span id="char-count">0</span>/280</div>
+                            <textarea class="composer-textarea" placeholder="What's happening?"></textarea>
+                            <div class="composer-char-count"><span id="char-count">0</span> characters</div>
 
                             <!-- Media Upload -->
                             <div class="media-upload-zone" id="media-upload-zone">
@@ -452,6 +451,16 @@
                                 <button class="icon-btn danger" title="Delete">🗑️</button>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Missed Posts Section -->
+                <div class="missed-posts-section" id="missed-posts-section" style="display: none;">
+                    <h3 class="upcoming-header missed-header">⚠️ Missed Posts</h3>
+                    <p class="missed-subtitle">These posts were scheduled but missed because the browser wasn't open.
+                    </p>
+                    <div class="missed-posts-list">
+                        <!-- Populated by JavaScript -->
                     </div>
                 </div>
 

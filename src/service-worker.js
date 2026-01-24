@@ -139,6 +139,34 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       return;
     }
 
+    // Check if post is within grace period (5 minutes)
+    const gracePeriodMs = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+
+    if (now - post.scheduledTime > gracePeriodMs) {
+      // Post is past grace period - mark as missed instead of posting
+      console.log(`[TweetAssist] Post ${postId} is past grace period. Marking as missed.`);
+
+      const missedResult = await chrome.storage.local.get(['missed-posts']);
+      const missedPosts = missedResult['missed-posts'] || [];
+      missedPosts.push({
+        ...post,
+        missedAt: now,
+        originalScheduledTime: post.scheduledTime
+      });
+      await chrome.storage.local.set({ 'missed-posts': missedPosts });
+
+      // Remove from scheduled posts
+      const updatedPosts = scheduledPosts.filter(p => p.id !== postId);
+      await chrome.storage.local.set({ 'scheduled-posts': updatedPosts });
+
+      // Clean up lock
+      await chrome.storage.local.remove([lockKey]);
+
+      console.log(`[TweetAssist] Post ${postId} moved to missed posts. Not auto-posting.`);
+      return;
+    }
+
     // Set as pending post
     await chrome.storage.local.set({
       'pending-post': {

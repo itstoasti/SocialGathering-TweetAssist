@@ -1127,4 +1127,207 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // ============================================
+    // Missed Posts Management
+    // ============================================
+
+    async function loadMissedPosts() {
+        const missedSection = document.getElementById('missed-posts-section');
+        const missedList = document.querySelector('.missed-posts-list');
+        if (!missedSection || !missedList) return;
+
+        const result = await chrome.storage.local.get(['missed-posts']);
+        const missedPosts = result['missed-posts'] || [];
+
+        // Hide section if no missed posts
+        if (missedPosts.length === 0) {
+            missedSection.style.display = 'none';
+            return;
+        }
+
+        missedSection.style.display = 'block';
+
+        // Sort by missed time (most recent first)
+        missedPosts.sort((a, b) => b.missedAt - a.missedAt);
+
+        missedList.innerHTML = missedPosts.map(post => {
+            const originalDate = new Date(post.originalScheduledTime || post.scheduledTime);
+            const dateStr = originalDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const timeStr = originalDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const hasMedia = post.mediaBase64 ? '<div class="post-media-preview">🖼️ 1 image attached</div>' : '';
+
+            return `
+                <div class="scheduled-post-card missed" data-post-id="${post.id}">
+                    <div class="post-time">
+                        <span class="post-date">${dateStr}</span>
+                        <span class="post-hour">${timeStr}</span>
+                        <span class="missed-badge">⚠️ Missed</span>
+                    </div>
+                    <div class="post-content">
+                        <p>${escapeHtml(post.text || '').substring(0, 100)}${post.text?.length > 100 ? '...' : ''}</p>
+                        ${hasMedia}
+                    </div>
+                    <div class="post-actions">
+                        <button class="reschedule-btn" data-post-id="${post.id}" title="Reschedule">
+                            🔄 Reschedule
+                        </button>
+                        <button class="icon-btn danger delete-missed-btn" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add event listeners
+        missedList.querySelectorAll('.reschedule-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const postId = e.target.closest('.reschedule-btn').dataset.postId;
+                openRescheduleModal(postId);
+            });
+        });
+
+        missedList.querySelectorAll('.delete-missed-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const card = e.target.closest('.scheduled-post-card');
+                const postId = card.dataset.postId;
+                if (confirm('Delete this missed post?')) {
+                    await deleteMissedPost(postId);
+                    loadMissedPosts();
+                }
+            });
+        });
+    }
+
+    async function deleteMissedPost(postId) {
+        const result = await chrome.storage.local.get(['missed-posts']);
+        let missedPosts = result['missed-posts'] || [];
+        missedPosts = missedPosts.filter(p => p.id !== postId);
+        await chrome.storage.local.set({ 'missed-posts': missedPosts });
+    }
+
+    function openRescheduleModal(postId) {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'reschedule-modal-overlay';
+        overlay.innerHTML = `
+            <div class="reschedule-modal">
+                <h3>📅 Reschedule Post</h3>
+                <div class="form-group">
+                    <label>New Date</label>
+                    <input type="date" id="reschedule-date" class="schedule-date">
+                </div>
+                <div class="form-group">
+                    <label>New Time</label>
+                    <input type="time" id="reschedule-time" class="schedule-time">
+                </div>
+                <div class="reschedule-modal-actions">
+                    <button class="btn-secondary" id="cancel-reschedule">Cancel</button>
+                    <button class="btn-primary" id="confirm-reschedule">Reschedule</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Set default values to tomorrow at 9am
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+
+        const dateInput = overlay.querySelector('#reschedule-date');
+        const timeInput = overlay.querySelector('#reschedule-time');
+
+        dateInput.value = tomorrow.toISOString().split('T')[0];
+        timeInput.value = '09:00';
+
+        // Event listeners
+        overlay.querySelector('#cancel-reschedule').addEventListener('click', () => {
+            overlay.remove();
+        });
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+            }
+        });
+
+        overlay.querySelector('#confirm-reschedule').addEventListener('click', async () => {
+            const newDate = dateInput.value;
+            const newTime = timeInput.value;
+
+            if (!newDate || !newTime) {
+                alert('Please select a date and time.');
+                return;
+            }
+
+            const newDateTime = new Date(`${newDate}T${newTime}`);
+            const now = new Date();
+
+            if (newDateTime <= now) {
+                alert('Please select a future date and time.');
+                return;
+            }
+
+            await reschedulePost(postId, newDateTime.getTime());
+            overlay.remove();
+        });
+    }
+
+    async function reschedulePost(postId, newScheduledTime) {
+        // Get the missed post
+        const result = await chrome.storage.local.get(['missed-posts', 'scheduled-posts']);
+        const missedPosts = result['missed-posts'] || [];
+        const scheduledPosts = result['scheduled-posts'] || [];
+
+        const post = missedPosts.find(p => p.id === postId);
+        if (!post) {
+            alert('Post not found.');
+            return;
+        }
+
+        // Create new post ID to avoid conflicts
+        const newPostId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Create new scheduled post
+        const newPost = {
+            id: newPostId,
+            text: post.text,
+            mediaBase64: post.mediaBase64,
+            mediaName: post.mediaName,
+            scheduledTime: newScheduledTime,
+            createdAt: Date.now()
+        };
+
+        // Add to scheduled posts
+        scheduledPosts.push(newPost);
+        await chrome.storage.local.set({ 'scheduled-posts': scheduledPosts });
+
+        // Remove from missed posts
+        const updatedMissedPosts = missedPosts.filter(p => p.id !== postId);
+        await chrome.storage.local.set({ 'missed-posts': updatedMissedPosts });
+
+        // Create alarm for new post
+        chrome.runtime.sendMessage({
+            action: 'schedule-post-alarm',
+            postId: newPostId,
+            scheduledTime: newScheduledTime
+        });
+
+        // Refresh displays
+        loadScheduledPosts();
+        loadMissedPosts();
+        highlightDaysWithPosts();
+
+        // Show confirmation
+        const dateStr = new Date(newScheduledTime).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+        alert(`Post rescheduled for ${dateStr}`);
+    }
+
+    // Load missed posts on page load
+    loadMissedPosts();
+
 });
